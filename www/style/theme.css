@@ -1,0 +1,238 @@
+/* source and set font after downloading */
+@font-face {
+  font-family: 'St. Jude Sans';
+  src: url('stjude-sans/sjs-regular.woff2') format('woff2'),
+       url('stjude-sans/sjs-regular.woff') format('woff'),
+       url('stjude-sans/sjs-regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+*{font-family: "St. Jude Sans", Arial, sans-serif;
+}
+
+
+
+
+.content {
+  background-color: #dfe1df !important;
+  color: #474c55;
+}
+.wrapper {
+    background-color: #d11947;
+}
+
+.content-wrapper, .right-side {
+  min-height: 100vh; /* Ensures the content wrapper takes up the full height */
+  padding-bottom: 0px; /* Space for the footer */
+}
+
+
+/* sidebar menu */
+.main-sidebar {
+  background-color: #fff;
+  border: 1px solid #c7c9c8;
+}
+.main-sidebar, .sidebar-menu a {
+  background-color: #fff  !important;
+  color: #000000 !important;
+  border: 0.25px solid #dfe1df
+}
+.sidebar-menu>li>a:hover {
+  background-color: #dfe1df !important;
+  border-left-color: #474c55 !important;
+}
+.sidebar-menu>li.active>a {
+  background-color: #c7c9c8 !important;
+  border-left-color: #474c55 !important;
+}
+
+
+/* main header*/
+.navbar {
+    background-color: #00437b !important;
+}
+.main-header .navbar {
+    background-color: #00437b;
+    color: #fff !important;
+}
+.main-header .logo {
+    background-color: #00437b !important;
+    color: #fff !important;
+}
+
+.skin-blue .main-header .navbar .sidebar-toggle:hover {
+    background-color: #008ccf !important;
+}
+
+
+/* background */
+.content{
+  background-color: #dfe1df ;
+}
+
+
+/* tabs on homepage */
+.nav-tabs-custom>.nav-tabs>li.active {
+    border-top-color: #474c55 !important;
+    color: #c7c9c8!important;
+}
+
+/* Change the border of the tabBox */
+.nav-tabs-custom {
+  border: 0.7px solid #c7c9c8;
+}
+
+
+/* boxes */
+.box.box-solid.box-primary>.box-header {
+    color: #fff !important;
+    background-color: #474c55 !important;
+}
+.box.box-solid.box-primary {
+  border: 1px!important;
+  border-color: #474c55!important;
+}
+.box.box-solid.box-info>.box-header {
+    color: #474c55 !important;
+    background-color: #c7c9c8 !important;
+}
+.box.box-info {
+  border: 1px!important;
+  border-color: #474c55!important;
+}
+.box.box-primary {
+    border-top-color: #474c55 !important;
+}
+
+
+
+
+
+/* Buttons */
+.btn-primary {
+  background-color: #fff !important;
+  border-color: #8d0034!important;
+  color: #8d0034 !important;
+}
+.btn-primary:hover {
+  background-color: #8d0034 !important;
+  border-color: #c7c9c8 !important;
+  color: #fff!important;
+}
+.btn-primary.active, .btn-primary:active {
+  background-color: #8d0034 !important;
+  border-color: #8d0034 !important;
+  color: #fff!important;
+}
+
+
+/* action button */
+.action-button {
+  background-color: white !important;
+  border: 1px solid #8d0034!important;
+  color: #8d0034!important;
+}
+.action-button:hover {
+  transform: scale(1.09);
+  background-color: #8d0034 !important;
+  color: #fff !important;
+}
+
+
+/* links */
+a:link {
+  color: #1874dc;
+}
+a:hover {
+  color: #00437b;
+}
+a:active {
+  color: #00437b;
+}
+
+
+/*progess bars */
+
+.btn-file {
+  background-color:#dfe1df; 
+  border-color: #dfe1df; 
+}
+
+.progress-bar {
+  background-color: #008ccf;
+}
+
+/* error, success popups */
+div:where(.swal2-icon).swal2-error [class^=swal2-x-mark-line] {
+    background-color: #e03400;
+}
+div:where(.swal2-icon).swal2-error {
+    border-color: #e03400 !important;
+    color: #e03400 !important;
+}
+div:where(.swal2-icon).swal2-success .swal2-success-ring {
+    border: .25em solid #008a1c !important;
+    border-radius: 50%;
+}
+div:where(.swal2-icon).swal2-success {
+    border-color: #008a1c !important;
+    color: #008a1c !important;
+}
+div:where(.swal2-icon).swal2-success [class^=swal2-success-line] {
+    display: block;
+    position: absolute;
+    z-index: 2;
+    height: .3125em;
+    border-radius: .125em;
+    background-color: #008a1c !important;
+}
+
+/* Select Input */
+select {
+  background-color: #f0f0f0;
+  border: 1px solid #ccc;
+  color: #000000;
+  padding: 5px;
+  font-size: 14px;
+  border-radius: 4px;
+  outline: none;
+}
+
+select:focus {
+  border-color: #008ccf;
+  box-shadow: 0 0 8px rgba(102, 175, 233, 0.6);
+}
+
+/* Customize dropdown options */
+select option {
+  background-color: #008ccf;
+  color: #474c55;
+}
+
+
+.main-footer {
+        position: absolute;
+        left: 0;
+        right:0;
+        width: width: calc(100% - 50px); /* Subtract the padding for consistent width */
+        background-color: #00437b;
+        color: white;
+        text-align: center;
+        padding: 10px;
+        z-index: 1000;
+        transition: left 0.3s;
+      }
+.footer-links {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+.footer-links a {
+        margin: 0 10px;
+        color: #1874dc;
+        text-decoration: none;
+}
+.footer-links a:hover {
+        text-decoration: underline;
+      }
+      
