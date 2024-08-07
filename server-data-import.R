@@ -9,14 +9,14 @@ output$dataSourceSelect <- renderUI({
     "SampleDatabase",
     "Select Sample Data",
     choices = c(
-      "JUMP sample" = "sample_data/combined_norm_uni_test_example.txt"
+      "JUMP sample" = "sample_data/example_data/jumpshiny.csv"
     )
   )
 })
 
 # If Sample Data button has been clicked, load sample data. ----
 
-observeEvent(input$CountDataSample, {
+observeEvent(input$ExpressionDataSample, {
   dataImportCheck$importRunValue <- FALSE
 
   if (input$SampleDatabase == "sample_data/combined_norm_uni_test_example.txt") {
@@ -53,14 +53,14 @@ dupValidate <- function(input){
   }
 }
 
-observeEvent(input$uploadCountData, {
+observeEvent(input$uploadExpressionData, {
   showNotification("Start uploading file...", type = "message")
   
   shinyCatch(
     {
       #read in uploaded data
       rawdata <-
-        data.frame(fread(input$uploadCountData$datapath))
+        data.frame(fread(input$uploadExpressionData$datapath))
       
       #omit NA values
       nNA <- sum(is.na(rawdata))
@@ -202,7 +202,7 @@ output$table <- DT::renderDataTable({
 
 output$emptyTable <- renderUI({
   if (nrow(datasetInput()) == 0) {
-    tags$p("No data to show. Click", tags$code("Sample"), "or", tags$code("Upload"), "your own dataset.")
+    tags$p("No data to show. Click", tags$code("Example"), "or", tags$code("Upload"), "your own dataset.")
   } else {
     DT::dataTableOutput("table")
   }
@@ -510,7 +510,7 @@ output$sampleDistributionDensity <- renderPlotly({
     group <- variables$group_import
 
     densityTable <- apply(data, 2, function(x) {
-      density(x)
+      density(na.omit(x))
     })
     p <- plot_ly(type = "scatter", mode = "lines")
     for (i in 1:length(densityTable)) {
@@ -549,9 +549,9 @@ output$sampleDistributionDensityPanel <- renderUI({
       column(
         3,
         popify(
-          helpText("Filter proteins with a total read count smaller than thresholds."),
-          title = "Reference",
-          content = 'Sultan, Marc, et al. <a href="http://science.sciencemag.org/content/321/5891/956">"A global view of gene activity and alternative splicing by deep sequencing of the human transcriptome."</a> <i>Science</i> 321.5891 (2008): 956-960.',
+          helpText("Filter proteins by intensities"),
+          title = "Explanation",
+          content = "Filter proteins by intensites lower than thershold ",
           placement = "left"
         ),
         sliderTextInput(
@@ -562,7 +562,7 @@ output$sampleDistributionDensityPanel <- renderUI({
         textInput(
           inputId = "sampleDistributionDenstityTitle",
           label = "Title",
-          value = "Raw Intensity",
+          value = "Sample density ditribution",
           placeholder = "Original Raw Intensity"
         ),
         textInput(
@@ -700,9 +700,9 @@ output$lowCountFilterByCutoffUI <- renderUI({
       column(
         3,
         popify(
-          helpText("Filter proteins with a total read count smaller than thresholds."),
+          helpText("Filter proteins with intensities smaller than thresholds."),
           title = "Reference",
-          content = 'Sultan, Marc, et al. <a href="http://science.sciencemag.org/content/321/5891/956">"A global view of protein activity and alternative splicing by deep sequencing of the human transcriptome."</a> <i>Science</i> 321.5891 (2008): 956-960.',
+          content = "Filter proteins by intensity values",
           placement = "left"
         ),
         sliderInput(
@@ -1215,7 +1215,7 @@ output$dendPlotObject <- renderPlotly({
       hclust_method = input$dendCluster,
       labRow = rownames(data),
       labCol = colnames(data),
-      colors = GnBu(100)
+      colors = rev(RdBu(100))
     ) %>%
       plotly::config(
         toImageButtonOptions = list(

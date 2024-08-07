@@ -1692,11 +1692,12 @@ observeEvent(input$heatmapRun,{
   
   
   #merge datasets
-  sampleData <- merge(df1,df2,by = "row.names", all = TRUE, suffixes = c(".Up", ".Down"))
-  rownames(sampleData) <- sampleData$Row.names
-  sampleData <- sampleData[ , -1] # Remove the Row.names column
-  sampleData <- sampleData[1:ncol(data)]
-  colnames(sampleData) <- colnames(data)
+  sampleData <- rbind(df1,df2)
+  # sampleData <- merge(df1,df2,by = "row.names", all = TRUE, suffixes = c(".Up", ".Down"))
+  # rownames(sampleData) <- sampleData$Row.names
+  # sampleData <- sampleData[ , -1] # Remove the Row.names column
+  # sampleData <- sampleData[1:ncol(data)]
+  #colnames(sampleData) <- colnames(data)
   
   
   #update input values
@@ -1720,7 +1721,7 @@ observeEvent(input$heatmapRun,{
   rmv = names(tab)[1:min(which(checkNA==0))]
   
   mat <- mat[complete.cases(mat),]
-  mat = mat[-as.numeric(rmv),]
+  #mat = mat[-as.numeric(rmv),]
   
   mat = t(scale(t(mat), center = T, scale = F)) # Only mean-centering
   

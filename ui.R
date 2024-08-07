@@ -6,8 +6,8 @@ library(fresh)
 stjudelogo <- tags$a(href='https://www.stjude.org',
   tags$img(
   src = "images/icons/SJ_Full_H_W.png",
-  style = 'height: 50px; width: 120px; position: absolute; transform: translateX(-50%);'
-))
+  style = 'height: 50px; width: 120px; left: 50%;position: absolute; transform: translateX(-50%);'
+),target = "_blank")
 
 
 
@@ -16,13 +16,11 @@ header <-  htmltools::tagQuery(dashboardHeader(
     class = "dropdown",
     tags$style(".main-header {min-height: 50px}"),
   ),
-  title = stjudelogo))
+  title = "JUMP Shiny"))
 header <- header$
   addAttrs(style = 'position:relative;')$ # add some styles to the header 
   find(".navbar.navbar-static-top")$ # find the header right side
-  append(span(h2(strong("JUMP Shiny"), align = "center", style = 'font-size:19px;
-                 font-family: "St. Jude Sans", Arial, sans-serif;
-                 position: relative;')))$ # inject our img
+  append(stjudelogo)$ # 
   allTags()
 
 tagList(
@@ -86,7 +84,7 @@ tagList(
             title = "",
             width = NULL,
             tabPanel(
-              title = "Welcome to JUMP-Suite",
+              title = "Welcome to JUMP Shiny",
               icon = icon("info"),
               fluidRow(
                 column(

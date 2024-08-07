@@ -64,6 +64,39 @@ for (e in commandArgs(T)) {
 normRun <- reactiveValues(normRunValue = FALSE)
 #v$importActionValue <- F
 
+output$batchSelect <- renderUI({
+  meatData1 <- reactive(variables$group)
+  df = metaData1()
+  if (is.null(colnames(df))) {
+    vars = NULL
+  } else {
+    vars = colnames(df)[2: ncol(df)]    
+  }
+  
+  selectInput("group_batch", "Batch selection",
+              choices = vars, selected = vars[1])
+})
+
+output$internalReference <- renderUI({
+  
+  meatData1 <- reactive(variables$group)
+  df = metaData1()
+  if (is.null(colnames(df))) {
+    vars = NULL
+  } else {
+    vars = colnames(df)[2: ncol(df)]    
+  }
+  if(input$normalization == "internalNM"){
+    selectInput(
+      inputId = "intRefCol",
+      label = "Internal reference column",
+      choices = vars,
+      selected = vars[1]
+    )
+  }
+})
+
+
 #if the batchlist is uploaded
 observeEvent(input$confirmedBatchList, {
   progressSweetAlert(
@@ -102,20 +135,37 @@ observeEvent(input$confirmedBatchList, {
     value = 20
   )
   
-  if (input$batchSelectViaText == "") {
-    sendSweetAlert(
-      session = session,
-      title = "ERROR",
-      text = "Please input group information!",
-      type = "error"
-    )
-    return()
-  }
+  # if (input$batchSelectViaText == "") {
+  #   sendSweetAlert(
+  #     session = session,
+  #     title = "ERROR",
+  #     text = "Please input group information!",
+  #     type = "error"
+  #   )
+  #   return()
+  # }
   
   #input the batch group list from user
-  batchinput <- reactive({
-    input$batchSelectViaText
-  })
+  batchgroup <- input$group_batch
+  
+  groupList <- variables$group
+  
+  idx <- as.numeric(grep(batchgroup, colnames(groupList)))
+  if(colnames(groupList)[1] == "Sample"){
+    colnames(groupList)[1] <- tolower(colnames(groupList)[1])
+  }
+  
+  #get the new group
+  variables$batchGroupList <-
+    lapply(unique(groupList[,idx]), function(x) {
+      groupList[which(groupList[,idx] == x), ]$sample
+    })
+  names(variables$batchGroupList) <- unique(groupList[,idx])
+
+  #get the batch group
+  batchgroup <- groupList[,c(1,idx)]
+  colnames(batchgroup) <- c("sample","batch")
+  
   
   updateProgressBar(
     session = session,
@@ -123,19 +173,20 @@ observeEvent(input$confirmedBatchList, {
     title = "Calculating normalization factors",
     value = 40
   )
+  #batchinput <- reactive(input$batchSelectViaText)
   
   
-  batchgroup <- data.frame(fread(batchinput(), header = FALSE,fill = T))
-  batchgroup <- batchgroup[-1,]
-  variables$batchGroupList <- batchgroup
-  # 
-  variables$batchGroupList <-
-    lapply(unique(batchgroup$V2), function(x) {
-      batchgroup[batchgroup$V2 == x, ]$V1
-    })
-  names(variables$batchGroupList) <- unique(batchgroup$V2)
+  # batchgroup <- data.frame(fread(batchinput(), header = FALSE,fill = T))
+  # batchgroup <- batchgroup[-1,]
+  # variables$batchGroupList <- batchgroup
+  # # 
+  # variables$batchGroupList <-
+  #   lapply(unique(batchgroup$V2), function(x) {
+  #     batchgroup[batchgroup$V2 == x, ]$V1
+  #   })
+  # names(variables$batchGroupList) <- unique(batchgroup$V2)
   
-  batch_vector=as.data.frame(batchgroup$V2)
+  batch_vector=as.data.frame(batchgroup$batch)
   bch=as.vector(batch_vector[,1])
   
   write.table(batchgroup,"test/batchgroup.txt")
@@ -150,14 +201,22 @@ observeEvent(input$confirmedBatchList, {
   
   #get the internal information
   if (input$normalization == 'internalNM') {
+    idx <- as.numeric(grep(input$intRefCol, colnames(groupList)))
+    interRef <- groupList[,idx]
     tryCatch(
       {
-        trans= as.data.frame(cbind(batchgroup$V2,batchgroup$V1,batchgroup$V3))
+        trans= as.data.frame(cbind(batchgroup$batch,batchgroup$sample,interRef))
+        standard_vector = trans[trans$interRef == "internal",]
+        standard_vector$interRef[1] = "standard"
+        standard_vector$interRef[2:nrow(standard_vector)] <- "non_standard"
+        write.table(standard_vector,"test/standard_vec.txt")
+        
+        norm=normalizeBatchesByInternalStandard(tb,bch,standard_vector)
       },
       error = function(e) {
         sendSweetAlert(
           session = session,
-          title = "Input data error!",
+          title = "Batch assigned failed.",
           text = as.character(message(e)),
           type = "error"
         )
@@ -166,20 +225,15 @@ observeEvent(input$confirmedBatchList, {
       warning = function(w) {
         sendSweetAlert(
           session = session,
-          title = "Input data warning!",
-          text = "Some error is in your group info, it maybe cause some problem we cannot expected.",
+          title = "Batch information incorrect",
+          text = "Some error is in the batch info.",
           type = "warning"
         )
         return()
       }
     )
     
-    standard_vector = trans[trans$V3 == "internal",]
-    standard_vector$V3[1] = "standard"
-    standard_vector$V3[2:nrow(standard_vector)] <- "non_standard"
-    write.table(standard_vector,"test/standard_vec.txt")
-    
-    norm=normalizeBatchesByInternalStandard(tb,bch,standard_vector)
+
   } else{ if (input$normalization == 'linearNM') {
     norm=removeBatchEffect(tb,bch)
   }}
@@ -300,6 +354,8 @@ output$normed_sampleDistributionBox <- renderPlotly({
   if (length(variables$normed.count.data) > 0) {
     normed_data <- variables$normed.count.data
     
+    normed_data <- as.data.frame(log2(normed_data))
+    
     # Filter
     log2data <- normed_data %>% filter_all(all_vars(. > input$normed_sampleDistributionFilterLow | is.na(.)))
     
@@ -318,7 +374,7 @@ output$normed_sampleDistributionBox <- renderPlotly({
     p <- plot_ly(
       data = data,
       x = ~ind,
-      y = ~value,
+      y = ~values,
       type = "box",
       split = ~group,
       color = ~group
@@ -346,8 +402,7 @@ output$normed_sampleDistributionDensity <- renderPlotly({
   if (length(variables$normed.count.data) > 0) {
     normed_data <- variables$normed.count.data
     if (input$norm_densityFilter != "Do not filter") {
-      # count <-
-      #   filterLowCountproteins(tcc, low.count = as.numeric(input$densityFilter))$count
+      
       count <-
         normed_data[rowSums(normed_data) > as.numeric(input$norm_densityFilter), ]
     } else {
@@ -357,7 +412,7 @@ output$normed_sampleDistributionDensity <- renderPlotly({
     
     group <- variables$normed_group_import
     densityTable <- apply(data, 2, function(x) {
-      density(x)
+      density(na.omit(x))
     })
     p <- plot_ly(type = "scatter", mode = "lines")
     for (i in 1:length(densityTable)) {
@@ -950,7 +1005,7 @@ output$normed_dendPlotObject <- renderPlotly({
       hclust_method = input$normed_dendCluster,
       labRow = rownames(data),
       labCol = colnames(data),
-      colors = GnBu(500)
+      colors = rev(RdBu(500))
     ) %>%
       config(
         toImageButtonOptions = list(

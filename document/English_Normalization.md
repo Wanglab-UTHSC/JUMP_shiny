@@ -25,19 +25,16 @@
 
 3. **Input Batch Group Information**
 
-   Input your batch group information in the text area, then click `Run Batch Normalization` to start the normalization process.
-
-   - Include headers in your batch group.
-   - No space between columns.
-   - Sample column must match the header in the imported data.
+   Select your batch group column in the dropdown menu.  
+   ![batchgroup](../www/images/batch_group.png){width=30%}
 
    - **Internal Method:**
-     Format: `sample,batch,info`  
-     Specify the internal sample in the **third** column.  
+     Format: Include one more `info` column.  
+     Select `internal` column for internal sample information. Make sure to specify the internal sample in the **info** column. 
      ![Internal Method](../www/images/internal.png){width=30%}
 
    - **Linear Method:**
-     Format: `sample,batch`  
+     Format: No need to have internal reference column.   
      ![Linear Method](../www/images/linear.png){width=30%}
 
 4. **Normalization Results**

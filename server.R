@@ -11,18 +11,18 @@ shinyServer(function(input, output, session) {
   
   # the modal dialog where the user can enter the query details.
   updates_modal <- modalDialog(
-    title = tags$h1("240702 Updates",style="text-align:center"),
+    title = tags$h1("240722 Updates",style="text-align:center"),
     tags$div(
       tags$h3("New Feature"),
       tags$ul(
         tags$li("Differential Expression Analysis: Now missing value imputation is available for pairwise comparison"),
-        #tags$li("Heatmap under DE: Allow user to choose clustering dendrogram on rows/columns"),
+        tags$li("Normalization and Covariates correction: no need to upload new meta information, all information are stored in one group file."),
         #tags$li("Covariates analysis could now work properly")
       ),
       tags$hr(),
       tags$h3("Fixes"),
       tags$ul(
-        tags$li("Sample distribution boxplot filter fixed")
+        tags$li("Heatmap filter and NA values now are executed correctly.")
         #tags$li("PCA 2D plot label fixed"),
         #tags$li("Moving SD calculation approach fixed")
       ),
