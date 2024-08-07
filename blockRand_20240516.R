@@ -455,13 +455,13 @@ final_outputs <- function(sample_factors_df, experiment_type, batch_volume, n_IR
   n_batches <- length(batches)
   sample_batch_final$batchID = factor(sample_batch_final$batchID, levels = batches)
   
-  if (experiment_type == "TMT") {
+  if (experiment_type == "TMT-labeling") {
     # add other and IR samples
     sample_batch_final_add <- add_TMT_channels(sample_batch_final, n_IRs, batch_volume, n_batches, n_factors)
     # sort by batch ID and TMT channels
     sample_batch_final_add$TMT_channel = factor(sample_batch_final_add$TMT_channel, levels = tmt_channels[1:batch_volume])
     sample_batch_final_add = dplyr::arrange(sample_batch_final_add, batchID, TMT_channel)
-  } else if (experiment_type == "Label-Free") {
+  } else if (experiment_type == "Label-free") {
     sample_batch_final_add = dplyr::arrange(sample_batch_final, batchID)
   }
 
@@ -474,15 +474,15 @@ final_outputs <- function(sample_factors_df, experiment_type, batch_volume, n_IR
   for (i in 1:n_factors) {
     batch_factor_table <- as.data.frame.matrix(table(sample_batch_final_add$batchID, sample_batch_final_add[,(i+2)])) 
     batch_design_factos[[i]] <- batch_factor_table[stringr::str_order(rownames(batch_factor_table), numeric = T), ]
-    if (experiment_type == "TMT") {
+    if (experiment_type == "TMT-labeling") {
       tmt_factor_table <- as.data.frame.matrix(table(sample_batch_final_add$TMT_channel, sample_batch_final_add[,(i+2)]))
       channel_design_factos[[i]] <- tmt_factor_table[stringr::str_order(rownames(tmt_factor_table), numeric = T),]
     }
   }
   
-  if (experiment_type == "TMT") {
+  if (experiment_type == "TMT-labeling") {
     final_results <- list(sample_batch_final_add, batch_design_factos, channel_design_factos)
-  } else if (experiment_type == "Label-Free") {
+  } else if (experiment_type == "Label-free") {
     final_results <- list(sample_batch_final_add, batch_design_factos)
   }
   

@@ -95,6 +95,15 @@ tagList(
               )
             ),
             tabPanel(
+              title = "Experimental design",
+              icon = icon("pen-nib"),
+              fluidRow(column(
+                includeMarkdown("document/English_Experiment_design.md"),
+                width = 10,
+                offset = 1
+              ))
+            ),
+            tabPanel(
               title = "Exploratory Analysis",
               icon = icon("file-import"),
               fluidRow(column(
@@ -121,15 +130,6 @@ tagList(
                 offset = 1
               ))
             ),
-            # tabPanel(
-            #   title = "eSEM Analysis",
-            #   icon = icon("magnifying-glass-chart"),
-            #   fluidRow(column(
-            #     includeMarkdown("document/English_eSEM.md"),
-            #     width = 10,
-            #     offset = 1
-            #   ))
-            # ),
             tabPanel(
               title = "Differential Expression",
               icon = icon("filter"),

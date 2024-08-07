@@ -29,18 +29,29 @@ output$inputData <- DT::renderDataTable({
   )
 })
 
+output$pre_inputData <- renderUI({
+  if (is.null(input$uploadData)) {
+    tags$p("No data to show. Click", tags$code("Browse"), "to upload the sample information.")
+  } else {
+    DT::dataTableOutput("inputData")
+  }
+})
+
 output$factorDistribution <- renderUI({
-  req(input$uploadData)
-  if (!is.null(df()) && ncol(df()) > 1) {
-    tabs <- lapply(seq_len(min(5, ncol(df()) - 1)), function(i) {
-      if (is.factor(df()[[i + 1]]) || is.character(df()[[i + 1]])) {
-        tabPanel(
-          paste0("Factor ", i),
-          fluidRow(column(12, plotlyOutput(paste0("factorDistPlot_", i), height = "267px")))
-        )
-      }
-    })
-    do.call(tabsetPanel, tabs)
+  if (is.null(input$uploadData)) {
+    helpText("Plots will be shown after uploading the sample information.")
+  } else {
+    if (!is.null(df()) && ncol(df()) > 1) {
+      tabs <- lapply(seq_len(min(5, ncol(df()) - 1)), function(i) {
+        if (is.factor(df()[[i + 1]]) || is.character(df()[[i + 1]])) {
+          tabPanel(
+            paste0("Factor ", i),
+            fluidRow(column(12, plotlyOutput(paste0("factorDistPlot_", i), height = "267px")))
+          )
+        }
+      })
+      do.call(tabsetPanel, tabs)
+    }
   }
 })
 
@@ -89,7 +100,7 @@ observeEvent({
   input$batch_volume
 }, {
 
-  if (input$experiment_type == "TMT" && input$batch_volume > 18) {
+  if (input$experiment_type == "TMT-labeling" && input$batch_volume > 18) {
     sendSweetAlert(
       session = session,
       title = "Warning",
@@ -123,15 +134,27 @@ output$sample_batch <- DT::renderDataTable({
                 ))
 })
 
+output$pre_sample_batch <- renderUI({
+  if (is.null(input$uploadData)) {
+    helpText("Results will be shown after running the program.")
+  } else {
+    DT::dataTableOutput("sample_batch")
+  }
+})
+
 #batch design matrix
 output$batch_design <- renderUI({
-  req(final_results())
-  tabs <- lapply(seq_along(final_results()[[2]]), function(i) {
-    tabPanel(
-      paste0("Factor ", i),
-      fluidRow(column(12, tableOutput(paste0("batch_design_", i)))))
-  })
-  do.call(tabsetPanel, tabs)
+  if (is.null(input$uploadData)) {
+    helpText("Results will be shown after running the program.")
+  } else {
+    req(final_results())
+    tabs <- lapply(seq_along(final_results()[[2]]), function(i) {
+      tabPanel(
+        paste0("Factor ", i),
+        fluidRow(column(12, tableOutput(paste0("batch_design_", i)))))
+    })
+    do.call(tabsetPanel, tabs)
+  }
 })
 
 observe({
@@ -160,7 +183,7 @@ output$download_all <- downloadHandler(
     batch_design_tables <- final_results()[[2]]
     for (i in seq_along(batch_design_tables)) {
       sheet_data <- batch_design_tables[[i]]
-      sheets[[paste("batch design", i)]] <- cbind(Batches = rownames(sheet_data), sheet_data)
+      sheets[[paste("batch design - factor", i)]] <- cbind(Batches = rownames(sheet_data), sheet_data)
     }
 
     # Conditionally add channel design tables for TMT experiments
@@ -168,7 +191,7 @@ output$download_all <- downloadHandler(
       channel_design_tables <- final_results()[[3]]
       for (i in seq_along(channel_design_tables)) {
         sheet_data <- channel_design_tables[[i]]
-        sheets[[paste("channel design", i)]] <- cbind(Channels = rownames(sheet_data), sheet_data)
+        sheets[[paste("channel design - factor", i)]] <- cbind(Channels = rownames(sheet_data), sheet_data)
       }
     }
 
