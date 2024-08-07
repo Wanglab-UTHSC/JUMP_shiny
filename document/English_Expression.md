@@ -42,7 +42,18 @@
      
 ---
 ## Missing value imputation
-1. If imputation is selected, JUMP shiny will:  
-  - only impute the missing values in selected two groups  
-  - only impute where all values in one group are completely missing
-2. When one protein is required to impute missing value, JUMP shiny will replace the missing value with the minimum value in that sample.(columnwise)
+
+<mark>Note: Currently, this option is only available for pairwise comparisons.</mark>
+
+There are three options for Missing values imputation:  
+![imputation](../www/images/imputation.png){width=30%}  
+
+1. `No Imputation`: The program will not perform any imputation or preprocessing on the data before differential expression analysis.
+2. `Imputation`: The program will handle missing values based on the following four cases:
+  - If there are no missing values in two groups, no imputation is performed.
+  - If one group has >1 values while the other group has ≥1 values , no imputation is executed.
+  - If one group is completely missing while the other group has more than one value, the missing values are imputed with the minimum value in the column(samplewise). The number of missing values imputed is equal to the number of values in the other group.
+  - If both groups have only one value or are completely missing, the protein row is discarded from the differential expression analysis. 
+3. `Data without NA`: Differential expression analysis will be performed only on proteins with complete intensity values.
+
+

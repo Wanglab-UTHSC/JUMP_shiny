@@ -1,0 +1,13 @@
+name: jump_suite_20240104
+title: JUMP_Suite_20240104
+username: azhang97
+account: azhang97
+server: svlprshiny01.stjude.org
+hostUrl: http://svlprshiny01.stjude.org/__api__
+appId: 75
+bundleId: 207
+url: http://svlprshiny01.stjude.org/content/75/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: .RData|server.R|ui.R

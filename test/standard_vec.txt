@@ -1,3 +1,3 @@
-"V1" "V2" "V3"
-"1" "batch1" "sig126" "standard"
-"6" "batch2" "sig129N" "non_standard"
+"V1" "V2" "interRef"
+"1" "B2" "B2_FAD_M_12m1" "standard"
+"15" "B6" "B6_WT_F_12m3" "non_standard"
