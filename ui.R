@@ -59,7 +59,7 @@ tagList(
           icon = icon("filter")
         ),
         menuItem(
-          "Enrichment Method",
+          "Enrichment Analysis",
           tabName = "enrichmentMethods",
           icon = icon("circle-nodes")
         ),
