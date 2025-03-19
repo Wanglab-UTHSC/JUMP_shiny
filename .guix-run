@@ -2,7 +2,7 @@
 
 echo Run: Rscript run_app.R
 
-guix shell -L $HOME/guix-bioinformatics -C -F -N --share=$HOME/.Rlibs/ r-shiny r r-plotly coreutils r-shinythemes r-fresh r-shinydashboard r-pacman r-annotate r-biocmanager r-circlize r-cluster r-clusterprofiler r-complexheatmap r-curl r-data-table r-dplyr r-dt r-fresh r-ggnewscale r-ggplot2 r-gplots r-gplots r-heatmaply r-igraph r-knitr r-limma r-markdown r-mass r-officer r-org-hs-eg-db r-org-mm-eg-db r-org-rn-eg-db r-pheatmap r-plotly r-plyr r-enrichplot r-rcolorbrewer r-readxl r-rmarkdown  r-shiny r-shinybs r-shinycssloaders r-shinydashboard r-shinyjs r-shinythemes r-stringr r-tidyr r-tidyverse r-webshot r-wgcna r-writexl r-zoo \
+guix shell -L guix-bioinformatics -C -F -N --share=$HOME/.Rlibs/ r-shiny r r-plotly coreutils r-shinythemes r-fresh r-shinydashboard r-pacman r-annotate r-biocmanager r-circlize r-cluster r-clusterprofiler r-complexheatmap r-curl r-data-table r-dplyr r-dt r-fresh r-ggnewscale r-ggplot2 r-gplots r-gplots r-heatmaply r-igraph r-knitr r-limma r-markdown r-mass r-officer r-org-hs-eg-db r-org-mm-eg-db r-org-rn-eg-db r-pheatmap r-plotly r-plyr r-enrichplot r-rcolorbrewer r-readxl r-rmarkdown  r-shiny r-shinybs r-shinycssloaders r-shinydashboard r-shinyjs r-shinythemes r-stringr r-tidyr r-tidyverse r-webshot r-wgcna r-writexl r-zoo \
 r-testthat r-usethis r-profvis r-roxygen2  -- Rscript run_app.R
 
 # r-utils
