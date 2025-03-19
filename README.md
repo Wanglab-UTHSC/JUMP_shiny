@@ -1,5 +1,11 @@
 # Running
 
+The main repo is hosted on:
+
+```
+git clone git.genenetwork.org:/home/git/shared/source/jumpshiny
+```
+
 ## Guix
 
 On the server we can deploy the service as a Guix container. Basically install Guix and run `guix pull`:
@@ -28,3 +34,7 @@ source .guix-run
 ```
 
 If you have a problem share the output on the console at any stage.
+
+## nginx
+
+For an example for proxy forwarding nginx, see [nginx.conf](etc/nginx.conf)
