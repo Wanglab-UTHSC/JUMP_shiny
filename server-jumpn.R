@@ -2,13 +2,13 @@
 ############################################################
 ########### Directly Source Five Native Scripts ############
 ############################################################
-source('JUMPn_Helpers/JUMPn_functions/wgcna_mod_test_large.R')       
-source('JUMPn_Helpers/JUMPn_functions/JUMPn_rich.R')      
-source('JUMPn_Helpers/JUMPn_functions/PPI_Analysis.R')    
+source('JUMPn_Helpers/JUMPn_functions/wgcna_mod_test_large.R')
+source('JUMPn_Helpers/JUMPn_functions/JUMPn_rich.R')
+source('JUMPn_Helpers/JUMPn_functions/PPI_Analysis.R')
 source('JUMPn_Helpers/JUMPn_functions/Network_Analysis.R')
-source('JUMPn_Helpers/JUMPn_functions/JUMPn_Errors.R')    
-source('JUMPn_Helpers/JUMPn_functions/ErrorModals.R')    
-source('JUMPn_Helpers/JUMPn_functions/JUMPn_UIs.R') 
+source('JUMPn_Helpers/JUMPn_functions/JUMPn_Errors.R')
+source('JUMPn_Helpers/JUMPn_functions/ErrorModals.R')
+source('JUMPn_Helpers/JUMPn_functions/JUMPn_UIs.R')
 source('JUMPn_Helpers/JUMPn_functions/JUMPn_Modals.R')
 
 ############################################################
@@ -121,7 +121,7 @@ observeEvent(input$BackgroundFileInfo,{
 })
 
 observeEvent(input$PPIFileInfo,{
-  my_message <- 'The customized PPI file contains three tab-seperated columns in the format of: <Protein_A>, “connection”, and <Protein_B>; here <Protein_X> are presented by the official gene names of each protein.'
+  my_message <- 'The customized PPI file contains three tab-seperated columns in the format of: <Protein_A>, "connection", and <Protein_B>; here <Protein_X> are presented by the official gene names of each protein.'
   WidgetInfoModal(session,my_message)
 })
 
@@ -149,9 +149,9 @@ observeEvent(input$DatabaseInfo,{
 
 observeEvent(input$MetaFileInfo,{
   #my_message <- 'Upload a meta file associating each sample with a specific group for large sample analysis and additional visualization.'
-  my_message='A meta file specifies the sample group information. 
-The meta file should contain at least two columns: column 1 must contain the sample names identical to the column names and order from the protein quantification matrix file; 
-Column 2 onwards will be used for group assignment for any number of features defined by the user. 
+  my_message='A meta file specifies the sample group information.
+The meta file should contain at least two columns: column 1 must contain the sample names identical to the column names and order from the protein quantification matrix file;
+Column 2 onwards will be used for group assignment for any number of features defined by the user.
 The number of columns is flexible.'
   WidgetInfoModal(session,my_message)
 })
@@ -174,16 +174,16 @@ observeEvent(input$FAQs,{
     showModal(imageModal5(output))
   } else if (input$FAQs == '6'){
     my_message <- 'WGCNA identifies clusters of genes/proteins that exhibit a common expression/abundance profile across replicates using several statistical parameters,
-          several of which are available to the user. The minimum cluster size controls how large an identified expression/abundance profile must be to be interpreted as a cluster. 
-          increasing the minimum cluster size will yield larger co-expression clusters, but small co-expression clusters may be missed.Pearson correlation reflects the degree of 
-          correlatio that must be observed betweeen the profiles of individual genes/proteins for them to exist in the same cluster. We traditionally hold the Pearson Correlation at .7. 
+          several of which are available to the user. The minimum cluster size controls how large an identified expression/abundance profile must be to be interpreted as a cluster.
+          increasing the minimum cluster size will yield larger co-expression clusters, but small co-expression clusters may be missed.Pearson correlation reflects the degree of
+          correlatio that must be observed betweeen the profiles of individual genes/proteins for them to exist in the same cluster. We traditionally hold the Pearson Correlation at .7.
           Decreasing the correlation will yield larger clusters, while increasing the correlation yields smaller clusters with fewer false positives. The minimum distance parameter reflects the minimum
           distance between clusters for them to be merged together. Increasing the miinimum distance will merge more clusters, and thus increase the cluster size.'
     WidgetInfoModal(session,my_message)
   } else if (input$FAQs == '7'){
     my_message <- 'Protein-Protein modularization is undertaken with two modularization steps. Initially, the protein-protein interaction network is overlaid onto the co-expression
           clusters and subsequently analyzed to identify "islands" of disconnected components. If any of these disconnected components exceed the minimum TOM-triggered module size (maximum modulle parameter for the user),
-          then the second modularization step is undertaken using TOM-based modularization. In TOM-based modularization, an adjacency matrix is gennerated and analyzed to find regions of interactions that are 
+          then the second modularization step is undertaken using TOM-based modularization. In TOM-based modularization, an adjacency matrix is gennerated and analyzed to find regions of interactions that are
           denser than the interactions throughout the network as a whole. The outcome of PPI analysis is a methodolgy which significantly enhances the identification of biological pathways and ontologies'
     WidgetInfoModal(session,my_message)
   } else if (input$FAQs == '8'){
@@ -220,12 +220,12 @@ observeEvent(input$meta_file,{
     extension <- file_ext(input$input_table$datapath)
     input_file <- input$input_table$datapath
     if (extension == 'xlsx'){                                                                            ### If the User File is .xlsx ...
-      table <- read_excel(input_file, na='NA') 
+      table <- read_excel(input_file, na='NA')
     } else if (extension == 'csv'){                                                                     ### If the User file is .csv  ...
       table <- read.csv(input_file)                                                               ### Also call read_excel function
     } else if (extension == 'txt'){                                                                     ### If the User file is ,txt
       table <- read_tsv(input_file)                                                               ### Call base r read.table function
-    }                 
+    }
     col_check <- colnames(table)
     val <- Check_file_type(session,input$meta_file$datapath,c('txt','csv','xlsx'),'meta_file',col_check)
     unresolved_error_ctr <- val
@@ -302,7 +302,7 @@ observeEvent(input$total_search,{
   Reactome <- as.data.frame(read_excel('JUMPn_Helpers/database_dependencies/ComprehensivePathwayDatabases.xlsx', sheet='Reactome'))
   GO <- as.data.frame(read_excel('JUMPn_Helpers/database_dependencies/ComprehensivePathwayDatabases.xlsx', sheet='GO'))
   HALLMARK <- as.data.frame(read_excel('JUMPn_Helpers/database_dependencies/ComprehensivePathwayDatabases.xlsx', sheet='HALLMARK'))
-  
+
   #print(input$PathwayEnrichment)
 
   if (is.null(input$PathwayEnrichment)==TRUE){
@@ -310,7 +310,7 @@ observeEvent(input$total_search,{
   } else {
     pathway_mode <- input$PathwayEnrichment
   }
-  
+
   if (pathway_mode!='User'){
     pathway_datasets <- list(KEGG, Reactome, GO, HALLMARK)
     pathway_vectorized_list <- list()
@@ -341,11 +341,11 @@ observeEvent(input$total_search,{
       #############################################################################################################################################
       executed_wgcna <- 0
       withProgress(message="Processing User Input File", value=0, max=1.2, {
-        
+
         if (ModeOfAnalysis()=='WGCNA+PPI' || ModeOfAnalysis()=='Independent WGCNA'){
           initial_time <- Sys.time()                                                                        ### Get Program Start Time
-          
-          project_wd <- getwd()  
+
+          project_wd <- getwd()
           project_wd
           print("line349")
 
@@ -354,37 +354,37 @@ observeEvent(input$total_search,{
           table <- table[,-idx]
           print(table)
           print("line353")
-          
-          gene_names <- table[,2]                                                                           ### Collect the gene names, which will always be in column 2 
-          input_data_frame <- data.frame(GN=table[,1])                                                     
+
+          gene_names <- table[,2]                                                                           ### Collect the gene names, which will always be in column 2
+          input_data_frame <- data.frame(GN=table[,1])
           expression_data <- table[,3:ncol(table)]
           expression_title <- colnames(expression_data)
           input_data_frame <- cbind(input_data_frame, expression_data)
-          
+
           column_name_list <- c('Gene Names')
-          
+
           for (replicate in 1:(ncol(table)-3)){
             replicate_name <- sprintf('%d', replicate)
             column_name_list <- c(column_name_list, replicate_name)
           }
-          
+
           colnames(input_data_frame) <- column_name_list
-          
+
           incProgress(message = "Transforming Expression Data", .1)
-          
+
           GN <- input_data_frame[,1]
           normalized_TMT_df <- data.frame(GN)
           input_expression_data <- as.data.frame(input_data_frame[,2:ncol(input_data_frame)])
           colnames(input_expression_data) <- colnames(table[,4:ncol(table)])
-          
+
           transformed <- input_expression_data
-          
+
           normalized_TMT_df <- cbind(normalized_TMT_df, transformed)
           print(normalized_TMT_df)
           #target_folder <- input$UserFolder
           target_folder <- paste0("test", str_remove_all(Sys.time(), ":"))
           dir.create(sprintf('%s/%s', project_wd, target_folder))
-          
+
           #target_folder <- sprintf('Output_Locus/%s',target_folder)
           #dir.create(sprintf('%s/%s', project_wd, target_folder))
           write.csv(normalized_TMT_df, file=paste(target_folder, "/norm_exp_matrix.csv", sep=''), quote=T,row.names=F,sep="\t")
@@ -392,7 +392,7 @@ observeEvent(input$total_search,{
           #############################################################################################################################################
           #############################################################################################################################################
           #############################################################################################################################################
-          
+
           #############################################################################################################################################
           #############################################################################################################################################
           ##################################################### Execute Co-Expression Clustering ######################################################
@@ -416,7 +416,7 @@ observeEvent(input$total_search,{
           execute_wgcna(input_exp_matrix = sprintf('%s/norm_exp_matrix.csv',target_folder), col_offset = 1, min_cluster_size = sprintf('%.2f',min_cluster_size), min_cluster_dist = sprintf('%.2f',min_cluster_dist),  min_kME=sprintf('%.2f',min_kME), network_type=sprintf('%s',network_type), scale_free_R_sq=sprintf('%.2f',scale_free_R_sq), non_scale_free_beta=16, outputDir=sprintf('%s',wgcna_directory), meta_file)
           post_wgcna <- Sys.time()
           file_list <- list.files(path=(sprintf('%s', wgcna_directory)))
-          for (item in file_list){ 
+          for (item in file_list){
             if (substr(item, 1, 7)=='Cluster'){
               cluster_file_list <- c(cluster_file_list, item)
             }
@@ -425,13 +425,13 @@ observeEvent(input$total_search,{
           #############################################################################################################################################
           #############################################################################################################################################
           #############################################################################################################################################
-          
+
           #############################################################################################################################################
           #############################################################################################################################################
           ##################################################### Cluster Based Pathway Enrichment ######################################################
           #############################################################################################################################################
           #############################################################################################################################################
-          
+
           cluster_dt_meta <- list()
           meta_ctr <- 1
           clust_ct <- 1
@@ -443,10 +443,10 @@ observeEvent(input$total_search,{
           pre_cluster_pathway_analysis <- Sys.time()
           KEGG_list <- list()
           Reactome_List <- list()
-          GO_List <- list() 
+          GO_List <- list()
           HALLMARK_List <- list()
           user_list <- list()
-          
+
           for (file in cluster_file_list){
             search_file <- sprintf("%s/%s", wgcna_directory, file)
             cluster_data <- read.table(search_file, sep = '\t', header=TRUE)
@@ -459,10 +459,10 @@ observeEvent(input$total_search,{
             print("line456")
             #genes <- list(genes)
             enrichment_list <- c(enrichment_list, list(genes)) # GN list by combining all clusters; question: is this one list? Or is it N list, one for each cluster? It appears it's N list, one for each cluster!
-            
+
             cluster_genes <- unique(toupper(unlist((genes))))
             write.table(cluster_genes, sprintf('%s/cluster%d_unique_gene_list.txt',wgcna_directory, clust_ct))
-            
+
             pre_time <- Sys.time()
             print('pre enrich')
             if (pathway_mode!='User'){
@@ -477,7 +477,7 @@ observeEvent(input$total_search,{
                   grouped_pathway_for_export <- grouped_pathways[[1]]
                   cluster_pathway_list[[clust_ct]] <- cbind(Cluster=sprintf('Cluster %d', clust_ct),grouped_pathway_for_export)
                 }
-              } 
+              }
               if (!is.null(grouped_pathways[[2]])==TRUE){
                 if(nrow(grouped_pathways[[2]])>0){
                   grouped_pathway_for_heatmap <- cbind(Cluster=sprintf('Cluster %d', clust_ct),grouped_pathways[[2]])
@@ -521,14 +521,14 @@ observeEvent(input$total_search,{
             upper_range <- max + (max*.01)
             mid <- (lower_range+upper_range)/2
             cluster_title <- sprintf('Cluster %d Average Expression Profile',clust_ct)
-            
-            ggplot(data=df2) + 
+
+            ggplot(data=df2) +
               geom_col(aes(x=Label, y=Expression, fill=Expression)) +
-              coord_cartesian(ylim=c(mean_min,mean_max)) + 
-              ggtitle(cluster_title) + 
-              xlab('Expression Replicates') + 
-              ylab('Intensity') + 
-              scale_color_continuous(low="red", high="green") + 
+              coord_cartesian(ylim=c(mean_min,mean_max)) +
+              ggtitle(cluster_title) +
+              xlab('Expression Replicates') +
+              ylab('Intensity') +
+              scale_color_continuous(low="red", high="green") +
               theme(plot.title = element_text(size=15, face='bold', hjust=0.5),
                     axis.title.x = element_text(face='bold',size=14),
                     axis.title.y = element_text(face='bold',size=14),
@@ -537,12 +537,12 @@ observeEvent(input$total_search,{
             ggsave(sprintf('%s/Cluster%d_ExpressionProfile.pdf',wgcna_directory,clust_ct))
             print("line528")
             cluster_dt_meta[[clust_ct]] <- cbind(Cluster=sprintf('Cluster %d', clust_ct),df_subset)
-            
+
             clust_ct <- clust_ct + 1
-          }  
-          
+          }
+
           cluster_title_list <- c()
-          
+
           for (n in 1:(clust_ct-1)){
             item <- sprintf('Cluster %d', n)
             cluster_title_list <- c(cluster_title_list, item)
@@ -594,7 +594,7 @@ observeEvent(input$total_search,{
                           selected = eigengene_grouplist[1])
             })
           }
-          
+
           output$ClusterDTSelectionBox <- renderUI({
             #selectInput('ClusterDTSelect', h5("Select the Cluster You'd Like to Display"),
             selectInput('ClusterDTSelect', h5("Select the Co-expression Cluster"),
@@ -606,7 +606,7 @@ observeEvent(input$total_search,{
             alpha2 <- dataTableOutput('ClusterDT')
             cluster_content_beta <- list(table_title,alpha2)
             do.call(tagList, cluster_content_beta)
-            
+
           })
           output$ResultsPath <- renderUI({
             path_tag <- htmlOutput('pathtag')
@@ -658,7 +658,7 @@ observeEvent(input$total_search,{
               })
               print('e')
               observeEvent(input$ClusterDT_cell_clicked, {
-                selection <- input$ClusterDT_cell_clicked    
+                selection <- input$ClusterDT_cell_clicked
                 row_clicked <- selection$row
                 if (is.null(row_clicked)==FALSE){
                   gene <- dt[row_clicked,2]
@@ -695,13 +695,13 @@ observeEvent(input$total_search,{
                 fluidRow(
                   column(6,
                          output$GeneExpression <- renderPlot({
-                           ggplot(data=df) + 
+                           ggplot(data=df) +
                              geom_col(aes(x=Label, y=Expression, fill=Expression)) +
-                             coord_cartesian(ylim=c(lower_range,upper_range)) + 
-                             ggtitle(title) + 
-                             xlab('Expression Replicates') + 
-                             ylab('Intensity') + 
-                             scale_color_continuous(low="red", high="green") + 
+                             coord_cartesian(ylim=c(lower_range,upper_range)) +
+                             ggtitle(title) +
+                             xlab('Expression Replicates') +
+                             ylab('Intensity') +
+                             scale_color_continuous(low="red", high="green") +
                              theme(plot.title = element_text(size=15, face='bold', hjust=0.5),
                                    axis.title.x = element_text(face='bold',size=14),
                                    axis.title.y = element_text(face='bold',size=14),
@@ -712,13 +712,13 @@ observeEvent(input$total_search,{
                   print('k'),
                   column(6,
                          output$Cluster_Expression <- renderPlot({
-                           ggplot(data=df2) + 
+                           ggplot(data=df2) +
                              geom_col(aes(x=Label, y=Expression, fill=Expression)) +
-                             coord_cartesian(ylim=c(mean_min,mean_max)) + 
-                             ggtitle(cluster_title) + 
-                             xlab('Expression Replicates') + 
-                             ylab('Intensity') + 
-                             scale_color_continuous(low="red", high="green") + 
+                             coord_cartesian(ylim=c(mean_min,mean_max)) +
+                             ggtitle(cluster_title) +
+                             xlab('Expression Replicates') +
+                             ylab('Intensity') +
+                             scale_color_continuous(low="red", high="green") +
                              theme(plot.title = element_text(size=15, face='bold', hjust=0.5),
                                    axis.title.x = element_text(face='bold',size=14),
                                    axis.title.y = element_text(face='bold',size=14),
@@ -731,7 +731,7 @@ observeEvent(input$total_search,{
             }
           })
           if (is.null(input$meta_file)==TRUE){
-            observeEvent(input$ExpressionDisplay, { 
+            observeEvent(input$ExpressionDisplay, {
               if (input$ExpressionDisplay=='Trends'){
                 output$ExpressionDisplayObject <- renderUI({
                   main_title <- htmlOutput("TrendTitle")
@@ -775,10 +775,10 @@ observeEvent(input$total_search,{
                        alt = "This is alternate text")
                 }, deleteFile=FALSE)
               }
-              
+
             })
           } else {
-            observeEvent(input$ExpressionDisplay, { 
+            observeEvent(input$ExpressionDisplay, {
               num <- match(input$ExpressionDisplay,eigengene_grouplist)
               choice <- eigengene_file_list[num]
               print(choice)
@@ -801,7 +801,7 @@ observeEvent(input$total_search,{
                      height = 500,
                      alt = "This is alternate text")
               }, deleteFile=FALSE)
-              
+
             })
           }
           #############################################################################################################################################
@@ -837,9 +837,9 @@ observeEvent(input$total_search,{
         ###################################################################################################################################################
         ###################################################################################################################################################
         ###################################################################################################################################################
-        
-        
-        
+
+
+
         #############################################################################################################################################
         #############################################################################################################################################
         ######################################################## Protein Interacton Analysis ########################################################
@@ -864,7 +864,7 @@ observeEvent(input$total_search,{
           }
           ppi_content <- read.table('JUMPn_Helpers/database_dependencies/BioPlex_String400_Inweb150_v1.0.1.sif', header=TRUE, colClasses= c(NA, "NULL", NA))
           combined_df_list <- list()
-          
+
           if (ModeOfAnalysis()=='WGCNA+PPI'){
             upper_combined_gene_list <- toupper(unique(unlist(enrichment_list))) # GN list by combining all clusters
             interaction_cluster <- ppi_content[((is.element(ppi_content[,1],upper_combined_gene_list)==TRUE) & (is.element(ppi_content[,2],upper_combined_gene_list)==TRUE) & (ppi_content[,1]!=ppi_content[,2])),] # subnetwork by overlaying cluster genes onto the PPI net
@@ -873,7 +873,7 @@ observeEvent(input$total_search,{
               print(cluster)
             }
           } else if (ModeOfAnalysis()=='Independent PPI'){
-            project_wd <- getwd() 
+            project_wd <- getwd()
             #target_folder <- input$UserFolder
             if (is.element('Output_Locus', list.files(project_wd))==FALSE){
               dir.create(sprintf('%s/Output_Locus', project_wd))
@@ -893,23 +893,23 @@ observeEvent(input$total_search,{
               ppi_stuff <- read.csv(ppi_file$datapath)                                                               ### Also call read_excel function
             } else if (file_type == 'txt'){                                                                     ### If the User file is ,txt
               ppi_stuff <- read_tsv(ppi_file$datapath)                                                               ### Call base r read.table function
-            }       
+            }
             clusters <- unique(unlist(ppi_stuff[,1]))
             for (cluster in 1:length(clusters)){
               enrichment_list <- toupper(unique(unlist(ppi_stuff[ppi_stuff[,1]==clusters[cluster],3])))
               combined_df_list[[cluster]] <-  ppi_content[((is.element(ppi_content[,1],enrichment_list)==TRUE) & (is.element(ppi_content[,2],enrichment_list)==TRUE) & (ppi_content[,1]!=ppi_content[,2])),] # subnetwork by overlaying cluster genes onto the PPI net
             }
           }
-          
+
           print('here')
           nodular_dataframe_list <- list()
           total_cluster_ctr <- 1
           interaction_clusters <- list()
-          
+
           modularization_folder <- 'ppi_modularization_output'
           dir.create(sprintf('%s/%s/%s',project_wd,target_folder,modularization_folder))
-          
-          for (cluster in combined_df_list){ # loop for each cluster: 
+
+          for (cluster in combined_df_list){ # loop for each cluster:
             print(sprintf('Cluster %d', total_cluster_ctr))
             data <- PPI_Modularization(cluster,input$TOM_triggered_module_size,total_cluster_ctr,project_wd,target_folder)
             if (is.null(data)==FALSE){
@@ -927,8 +927,8 @@ observeEvent(input$total_search,{
           #############################################################################################################################################
           #############################################################################################################################################
           #############################################################################################################################################
-          
-          
+
+
           post_ppi_analysis <- Sys.time()
           ###################################################################################################################################################
           ###################################################################################################################################################
@@ -944,9 +944,9 @@ observeEvent(input$total_search,{
           print("line923")
           final_node_frame <- nodular_meta_data[!duplicated(nodular_meta_data[,1]),]
           edge_meta_data <- do.call(rbind, interaction_clusters)
-          check_list <- unlist(nodular_meta_data[,1]) 
+          check_list <- unlist(nodular_meta_data[,1])
           rownames(edge_meta_data) <- c(1:nrow((edge_meta_data)))                        ##
-          colnames(edge_meta_data) <- c('from', 'to')  
+          colnames(edge_meta_data) <- c('from', 'to')
           final_edge_frame <- edge_meta_data[((is.element(edge_meta_data[,'from'],check_list)==TRUE) & (is.element(edge_meta_data[,2],check_list)==TRUE) ),]
           final_edge_frame <- cbind(final_edge_frame, weights=1)
           final_edge_frame <- cbind(final_edge_frame, color='black')
@@ -954,7 +954,7 @@ observeEvent(input$total_search,{
           ###################################################################################################################################################
           ###################################################################################################################################################
           ###################################################################################################################################################
-          
+
           ###################################################################################################################################################
           ###################################################################################################################################################
           #################################################### Develop Modularized Network Objects ##########################################################
@@ -971,7 +971,7 @@ observeEvent(input$total_search,{
           output$pathtag2 <- renderText(path_css2)
           dir.create(sprintf('%s/%s/network_models',project_wd,target_folder))
           net_file <- 'total_network.html'
-          nodular_frame_list <- list() 
+          nodular_frame_list <- list()
           modular_pathway_plot_list <- list()
           group_specific_table_list <- list()
           second_pathway_list_ctr <- 1
@@ -1017,7 +1017,7 @@ observeEvent(input$total_search,{
                       cluster_pathway_list[[clust_ct]] <- cbind(Cluster=sprintf('Cluster %d', modular_list_ctr),grouped_pathway_for_export)
                     }
                   }
-                } 
+                }
                 if (!is.null(cluster_pathway_table[[2]])==TRUE){
                   if(nrow(cluster_pathway_table[[2]])>0){
                     grouped_pathway_for_heatmap <- cbind(Module=the_groups[module],cluster_pathway_table[[2]])
@@ -1075,8 +1075,8 @@ observeEvent(input$total_search,{
           ###################################################################################################################################################
           ###################################################################################################################################################
           ###################################################################################################################################################
-          
-          
+
+
           #####################################################################################################################################################
           #####################################################################################################################################################
           ################################################### Construct PPI Modularized Output Objects ########################################################
@@ -1113,8 +1113,8 @@ observeEvent(input$total_search,{
                                      "Circle" = "layout_in_circle"),
                         selected = "Fruchterman Reingold")
           })
-          
-          
+
+
           observeEvent(input$ClusterSelect, {
             cluster <- input$ClusterSelect
             i <- match(cluster,cluster_object_list)
@@ -1125,30 +1125,30 @@ observeEvent(input$total_search,{
             title_1 <- sprintf("Co-Expression Cluster %d: %d Modules Found, %d Constituent Genes", i, num_modules, num_genes)
             css <- sprintf('<p style="font-size:30px">%s </p>', title_1)
             output$ClusterPlotTitle <- renderText(css)
-            layout <- reactive({ 
+            layout <- reactive({
               input$LayoutSelection
             })
             observeEvent(layout(), {
               output$ClusterPlot <- renderVisNetwork({
                 if (layout() == 'layout_with_fr'){
-                  visNetwork(network_content, edge_frame_list[[i]], height='1400px', width='100%') %>% 
+                  visNetwork(network_content, edge_frame_list[[i]], height='1400px', width='100%') %>%
                     visOptions(highlightNearest = TRUE, manipulation=TRUE,selectedBy = "group") %>%
-                    visIgraphLayout(layout='layout_with_fr', weights=edge_weight_list[[i]]) 
-                } else if (layout() == 'layout_in_circle') { 
-                  visNetwork(network_content, edge_frame_list[[i]], height='1400px', width='100%') %>% 
+                    visIgraphLayout(layout='layout_with_fr', weights=edge_weight_list[[i]])
+                } else if (layout() == 'layout_in_circle') {
+                  visNetwork(network_content, edge_frame_list[[i]], height='1400px', width='100%') %>%
                     visOptions(highlightNearest = TRUE, manipulation=TRUE,selectedBy = "group") %>%
-                    visIgraphLayout(layout='layout_in_circle') 
+                    visIgraphLayout(layout='layout_in_circle')
                 }
               })
             })
             output$ClusterBorder <- renderUI({
               addCssClass(class = 'networkplotborder1', selector = 'ClusterPlot')
             })
-            visNetwork(network_content, edge_frame_list[[i]], main=title_1 , height='2000px', width='100%') %>% 
+            visNetwork(network_content, edge_frame_list[[i]], main=title_1 , height='2000px', width='100%') %>%
               visOptions(highlightNearest = TRUE, manipulation=TRUE) %>%
               visIgraphLayout(layout='layout_with_fr', weights=edge_weight_list[[i]]) %>%
               visSave(file=sprintf("%s/cluster_%d_network.html",directory,i), selfcontained = FALSE)
-            
+
             output$DynamicModuleSelectionBox <- renderUI({
               selectInput('ModuleSelect', h5("Select the Module You'd Like to Display"),
                           choices = cluster_modules[[i]])
@@ -1166,7 +1166,7 @@ observeEvent(input$total_search,{
                                          'Heatmap'='Heatmap',
                                          'Table' = 'Table'))
             })
-            modulepathwayplot <- reactive({ 
+            modulepathwayplot <- reactive({
               input$ModulePathwaySelect
             })
             observeEvent(input$ModuleSelect, {
@@ -1183,11 +1183,11 @@ observeEvent(input$total_search,{
               css <- sprintf('<p style="font-size:30px">%s </p>', module_title)
               output$ModularPlotTitle <- renderText(css)
               output$ModularPlot <- renderVisNetwork({
-                visNetwork(gene_frame, edges, height='1400px', width='100%') %>% 
+                visNetwork(gene_frame, edges, height='1400px', width='100%') %>%
                   visOptions(highlightNearest = TRUE, manipulation=TRUE) %>%
-                  visIgraphLayout(layout='layout_with_fr', weights=edge_weights) 
+                  visIgraphLayout(layout='layout_with_fr', weights=edge_weights)
               })
-              
+
               observeEvent(modulepathwayplot(),{
                 if (is.null(group_specific_table_list[[k]])==FALSE){
                   if (modulepathwayplot()=='Barplot') {
@@ -1247,7 +1247,7 @@ observeEvent(input$total_search,{
                            height = 500,
                            alt = "This is alternate text")
                     }, deleteFile=FALSE)
-                    
+
                   }
                 } else if (is.null(group_specific_table_list[[k]])==TRUE){
                   output$ModulePathwayPlot <- renderUI({
@@ -1350,7 +1350,7 @@ observeEvent(input$total_search,{
                     output[['PathwayBarPlot']] <- renderPlot({
                       cluster_specific_group_plot[[i]]
                     }, height = 500, width=900)
-                    
+
                   } else if (input$ClusterExpressionDisplay=='Pathway Circle Plot') {
                     output$ExpressionFormat <- renderUI({
                       main_title <- htmlOutput("PathwayTitle")
@@ -1364,7 +1364,7 @@ observeEvent(input$total_search,{
                     output[['PathwayCirclePlot']] <- renderPlot({
                       circular.barplot(cluster_specific_table_list[[i]])
                     }, height = 500, width=800)
-                    
+
                   }
                 } else {
                   num <- match(input$ClusterExpressionDisplay,choice_vector)
@@ -1417,12 +1417,12 @@ observeEvent(input$total_search,{
                       circular.barplot(cluster_specific_table_list[[i]])
                     }, height = 500, width=800)
                   }
-                  
-                  
+
+
                 }
               } else if (ModeOfAnalysis()=='Independent PPI'){
               }
-            }) 
+            })
           })
           incProgress(message="Computing Network Modularity", .1)
           incProgress(message="Creating Modularized Networks", .1)
@@ -1434,7 +1434,7 @@ observeEvent(input$total_search,{
               group_vector1 <- unique(network_content[,'group'])
               num_modules <- length(group_vector1)
               title_1 <- sprintf("Co-Expression Cluster %d: %d Modules Found, %d Constituent Genes", i, num_modules, num_genes)
-              visNetwork(network_content, edge_frame_list[[i]], main=title_1 , height='2000px', width='100%') %>% 
+              visNetwork(network_content, edge_frame_list[[i]], main=title_1 , height='2000px', width='100%') %>%
                 visOptions(highlightNearest = TRUE, manipulation=TRUE) %>%
                 visIgraphLayout(layout='layout_with_fr', weights=edge_weight_list[[i]]) %>%
                 visSave(file=sprintf("%s/cluster_%d_network.html",directory,i), selfcontained = FALSE)
@@ -1451,15 +1451,15 @@ observeEvent(input$total_search,{
       ~~~~~~~~~~~~~~~~~~~~~~~~~~~
       ~~ User Input Parameters ~~
       ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      Min Cluster Size: %f 
-      Min Pearson Correlation: %f 
-      Min Distance: %f 
-      Min Module Size: %f 
+      Min Cluster Size: %f
+      Min Pearson Correlation: %f
+      Min Distance: %f
+      Min Module Size: %f
       PPI Database: %s
-      ', project_wd, target_folder, 
+      ', project_wd, target_folder,
                             input$min_cluster_size,input$min_kme, input$min_cluster_dist,
                             input$TOM_triggered_module_size, input$PPIDatabases)
-        
+
         write(log_file, sprintf('%s/%s/JUMPn.log',project_wd,target_folder))
         file_path <- sprintf('%s/%s/ComprehensiveSummaryTables.xlsx',project_wd,target_folder)
         #observeEvent(input$downloadData, {
@@ -1486,8 +1486,8 @@ observeEvent(input$total_search,{
         #})
         print(list.files(sprintf('%s/%s', project_wd,target_folder)))
         output_directory <<- sprintf('%s/%s', project_wd,target_folder)
-        
-        
+
+
         incProgress(message="Program Finished! Go To Network Analysis Page to View Results", .1)
       })
       total_time <- Sys.time()
@@ -1501,7 +1501,7 @@ observeEvent(input$total_search,{
       # print(pre_modular_pathway_analysis)
       # print(post_modular_pathway_analysis)
       # print(total_time)
-      # 
+      #
       # Total_Run_Time <- total_time-initial_time
       # WGCNA_time <- post_wgcna-pre_wgcna
       # cluster_pathway_time <- post_cluster_pathway_analysis-pre_cluster_pathway_analysis
@@ -1520,7 +1520,7 @@ observeEvent(input$total_search,{
       observeEvent(input$SubmitQuickPPI, {
         ModeOfAnalysis()=='WGCNA+PPI'
       })
-      
+
       if (ModeOfAnalysis()=='WGCNA+PPI'){
         showTab('whichtab', target='WGCNAPage')
         showTab('whichtab', target='PPIPage')
@@ -1535,14 +1535,14 @@ observeEvent(input$total_search,{
         output$WGCNATitlePage<- renderText({
           'Results Page: WGCNA Output'
         })
-      } else if (ModeOfAnalysis()=='Independent PPI'){ 
+      } else if (ModeOfAnalysis()=='Independent PPI'){
         showTab('whichtab', target='PPIPage')
         output$PPITitlePage<- renderText({
           'Results Page: PPI Output'
-          
+
         })
       }
-      
+
       observeEvent(input$TakeMeThere,{
         if (ModeOfAnalysis()=='WGCNA+PPI'){
           updateTabsetPanel(session, 'whichtab',selected='WGCNAPage')
@@ -1577,12 +1577,11 @@ observeEvent(input$total_search,{
             content = function(file) {
               files2zip <- dir(sprintf('%s/%s',project_wd, target_folder), full.names = TRUE)
               print(files2zip)
-              zip(zipfile=file, files=files2zip)    
+              zip(zipfile=file, files=files2zip)
             }
           )
           successful_download(session)
         }
-        
+
       })
     })
-

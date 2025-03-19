@@ -9,7 +9,7 @@ library(RColorBrewer)
 library(DT)
 library(curl)
 library(pheatmap)
-library(gridlayout)
+# library(gridlayout)
 library(zoo)
 library(shinyBS)
 
