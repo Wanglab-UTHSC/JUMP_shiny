@@ -1,19 +1,25 @@
-# Data Normalization
+---
+title: "Steps for Batch Normalization"
+output: 
+  html_document:
+     css: ../www/style/style.css
+---
 
-**Data normalization** is a crucial step in the analysis process that aims to correct unwanted technical variation in protein expression data arising from experimental batch effects. By applying normalization techniques, you can ensure that the observed differences in protein expression are due to biological variation rather than technical artifacts. This process offers several key benefits:  
+# Batch Normalization
 
-- Improving the Accuracy of Differential Expression Analysis: Normalization helps in accurately identifying true biological differences by eliminating technical noise.
+**Batch Normalization** aims to correct unwanted technical variation in protein expression data arising from experimental batch effects. By applying normalization techniques, you can ensure that the observed differences in protein expression are due to biological variation rather than technical artifacts. This process offers several key benefits:  
+
+- Improving the Accuracy of Differential Expression: Normalization helps in accurately identifying true biological differences by eliminating technical noise.
 - Reducing the Impact of Batch Effects: It minimizes the influence of variations introduced during different experimental batches, leading to more consistent and reliable data.
 - Enhancing the Reproducibility of Results: By standardizing the data, normalization ensures that the results are reproducible across different experiments and studies.
 
 ---
 
-## Steps for Normalization
-
+## Steps for Batch Normalization
 
 1. **Navigate to Batch Normalization Tab**
 
-   Click on the `Batch Normalization` tab located in the left sidebar of this page.
+   Click on the `Batch Normalization` tab in the left sidebar of this page.
 
    ![Batch Normalization Tab](../www/images/batch_screen.png){width=90%}
 
@@ -21,17 +27,17 @@
 
    Choose the appropriate normalization method based on your data:  
    
-   `Internal Normalization`: If your data has an internal reference, such as TMT data, you can normalize the data based on an internal sample.   
+   `Internal`: If your data has an internal reference, such as TMT data, you can normalize the data based on an internal sample.   
 
-   `Linear Normalization`: If your data doesn’t have an internal sample, select linear normalization. Linear normalization adjusts your dataset based on overall trends, bringing all samples to a common scale and correcting for systematic technical variations.
+   `Linear`: If your data doesn’t have an internal sample, select linear normalization. Linear normalization adjusts your dataset based on overall trends, bringing all samples to a common scale and correcting for systematic technical variations.
 
+   `Internal+Linear`: If your data has an internal reference, you can choose first internal normalization and then linear normalization for better results.
 
    ![Normalization Method](../www/images/normalization_method.png){width=30%}
 
 3. **Selecting Batch Group Information**
 
-   To perform batch normalization, please specify the necessary batch and internal reference as provided in the sample information file.
-Please use the dropdown menu to choose the relevant batch identifier and select the column that contains the internal reference sample information as provided in the sample information file. 
+   To perform batch normalization, please specify the necessary batch and internal reference as provided in the sample information file. Please use the dropdown menu to choose the relevant batch identifier and select the column that contains the internal reference sample information as provided in the sample information file. 
 
    Once you have selected the appropriate batch and internal reference column, click the `[Run Batch Normalization]` button to initiate the normalization process.
 
@@ -39,8 +45,7 @@ Please use the dropdown menu to choose the relevant batch identifier and select 
    ![batchgroup](../www/images/batch_group.png){width=30%}
 
    - **Internal Method:**
-     Format: Include one more `info` column.  
-     Select `internal` column for internal sample information. Make sure to specify the internal sample in the **info** column. 
+     Format: Include one more `Info` column. Make sure to specify the internal samples. 
      ![Internal Method](../www/images/internal.png){width=30%}
 
    - **Linear Method:**
@@ -49,7 +54,7 @@ Please use the dropdown menu to choose the relevant batch identifier and select 
 
 4. **Normalization Results**
 
-   After normalization, the Result Table will appear on the right side of the page. Similar to the `Exploratory Analysis`, Intensity Distribution, PCA plot, and sample distance plots are generated to assess the effectiveness of the normalization.
+   After normalization, the `Data Table` will appear on the right side of the page. Similar to the `Exploratory Analysis`, Intensity Distribution, PCA plot, and Sample Correlation are generated to assess the effectiveness of the normalization.
 
    ![batch distribution](../www/images/Batch_distribution.png){width=90%}
    
@@ -57,6 +62,6 @@ Please use the dropdown menu to choose the relevant batch identifier and select 
    
    ![batch distribution](../www/images/Batch_heatmap.png){width=90%}
 
-5. **Proceed to Covariance Correction or Differential Expression Analysis**
+5. **Proceed to Differential Expression**
 
-   Now, you can choose to perform `Covariance Correction` or proceed directly to `Differential Expression` analysis.
+   Now, you can directly proceed to `Differential Expression` analysis.

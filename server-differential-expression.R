@@ -9,7 +9,6 @@ library(RColorBrewer)
 library(DT)
 library(curl)
 library(pheatmap)
-# library(gridlayout)
 library(zoo)
 library(shinyBS)
 
@@ -27,6 +26,8 @@ source(file = "preprocess.R",
 DERun <- reactiveValues(DERunValue = FALSE)
 volrun <- reactiveValues(volrunval = FALSE)
 HeatmapRun <- reactiveValues(heatmapRunValue = FALSE, height = 300)
+
+
 
 #load group selection
 metaData1 <- reactive(variables$group)
@@ -81,17 +82,6 @@ output$group3 <- renderUI({
         choices = vars,
         selected = vars[2]
       )
-      output[[3]]=tagList(radioButtons(
-        inputId = "ImputationSelection",
-        label = "Missing Value Imputation",
-        choices = c("No Imputation" = "NA","Imputation" = "Imputation","Data without NAs"="CleanData"),
-        selected = "NA"
-      ),
-      # Popovers for each radio button choice
-     radioTooltip("ImputationSelection",choice = "NA",title = "No imputation on whole data"),
-     radioTooltip("ImputationSelection",choice = "Imputation",title = "See documentation for details"),
-     radioTooltip("ImputationSelection",choice = "CleanData",title = "No imputation and perform DE only on data without NAs")
-      )
   }else{
     validate(
       need(ngroup !=2, "There are only two groups. More than three groups is required.")
@@ -145,23 +135,31 @@ observeEvent(input$DETestType,{
     colnames(groupList)[1] <- tolower(colnames(groupList)[1])
   }
   
-  #get the new group
-  variables$groupList <-
-    lapply(unique(groupList[,idx]), function(x) {
-      groupList[which(groupList[,idx] == x), ]$sample
-    })
-  names(variables$groupList) <- unique(groupList[,idx])
+  # get the new group
+  variables$groupList <- split(groupList$sample, groupList[, idx])
+  
+  # #get the new group
+  # variables$groupList <-
+  #   lapply(unique(groupList[,idx]), function(x) {
+  #     groupList[which(groupList[,idx] == x), ]$sample
+  #   })
+  
+  # Match samples in the group with sample in the data
   data.cl <- rep(0, ncol(variables$CountData))
+  # names(variables$groupList) <- unique(groupList[,idx])
+  # data.cl <- rep(0, ncol(variables$CountData))
   
-  for (i in 1:length(variables$groupList)) {
-    data.cl[unlist(lapply(variables$groupList[[i]], convert2cl, df = variables$CountData))] <- names(variables$groupList[i])
+  
+  for (i in seq_along(variables$groupList)) {
+    idx <- match(variables$groupList[[i]], colnames(variables$CountData))
+    data.cl[idx] <- names(variables$groupList)[i]
   }
-  
+
   data.cl <- data.cl[data.cl!=0]
   
-  normed_tcc <- data
+  normed_data <- data
   metaData1 <- reactive(variables$group)
-  data1 = reactive(list(data = as.data.frame(normed_tcc,),level = "protein"))
+  data1 = reactive(list(data = as.data.frame(normed_data),level = "protein"))
   
   updateProgressBar(
     session = session,
@@ -219,8 +217,6 @@ observeEvent(input$DETestType,{
   
   for (g in 1:nGroups) {
     groupName = paste0("Group", g)
-    #comparison[g] = paste(dfSample$ID[dfSample[[input$groups2]] == factors[g]], collapse = ",")    # Oldest version
-    # comparison[g] = paste(dfSample[dfSample[[input$groups2]] == factors[g], 1], collapse = ",")
     cc = dfSample[dfSample[[input$groups2]] == factors[g], 1]
     cc <- unname(cc)
     cc <- unlist(cc)
@@ -237,102 +233,102 @@ observeEvent(input$DETestType,{
   )
   
   ############Imputation
-  nGroups = length(comparison)
-  groups = list()
-  nSamples = 0
-  samples = NULL
+  nGroups <- length(comparison)
+  groups <- list()
+  nSamples <- 0
+  samples <- NULL
+  
   for (g in 1:nGroups) {
-    groups[[g]] = unlist(strsplit(comparison[g], ","))
-    nSamples = nSamples + length(groups[[g]])
+    groups[[g]] <- unlist(strsplit(comparison[g], ","))
+    nSamples <- nSamples + length(groups[[g]])
     samples[[g]] <- groups[[g]]
   }
   
-  
-  group1=df[,samples[[1]]]
-  
-  group2=df[,samples[[2]]]
 
-  
-  data_imputation <- cbind(group1,group2)
-  
-  
-  #separate data into two groups
-  count_non_na_per_group_base <- function(data, group1, group2) {
-    count_group1 <- apply(group1, 1, function(x) sum(!is.na(x)))
-    count_group2 <- apply(group2, 1, function(x) sum(!is.na(x)))
-    result <- as.data.frame(cbind(count_group1,count_group2))
-    return(result)
+  grouplist <- list()
+  for (g in 1:nGroups) {
+    grouplist[[g]] <- df[, samples[[g]]]
   }
   
-  #perform imputation if selected
-  # Count non-missing values for each group in each row
-  data_counts <- count_non_na_per_group_base(data_imputation, group1, group2)
+  names(grouplist) <- paste0("group", seq_along(grouplist))
+  count_non_na_per_group <- as.data.frame(sapply(grouplist, function(x) {
+    apply(x, 1, function(y) sum(!is.na(y)))
+  }))
   
-  
-  
-  impute_data <- function(data, group1, group2,counts) {
+  # Generalized imputation function for handling multiple groups with data
+  impute_data <- function(data, grouplist, count_non_na_per_group) {
+    nGroups <- length(grouplist)  # Number of groups
+    group_names <- names(grouplist)  # Group names: group1, group2, ..., groupN
     
     for (i in 1:nrow(data)) {
-      count1 <- counts$count_group1[i]
-      count2 <- counts$count_group2[i]
+      counts <- count_non_na_per_group[i, ]
       
-      idx1 <- match(colnames(group1),colnames(data))
+      # Find indices for each group's samples in the data
+      idx <- lapply(1:nGroups, function(g) match(colnames(grouplist[[g]]), colnames(data)))
       
-      idx2 <- match(colnames(group2),colnames(data))
+      # Case 1: Handle groups with missing and available data
+      groups_with_data <- which(counts > 1)
+      groups_without_data <- which(counts < 1)
       
-      # Case 1: Only one group has more than 1 non-missing value
-      if ((count1 > 1 && count2 < 1) || (count2 > 1 && count1 < 1)) {
-        if (count1 > 1 && count2 < 1) {
-          group_more <- group1
-          idx_more <- idx1
-          group_less <- group2
-          idx_less <- idx2
-        } else {
-          group_more <- group2
-          idx_more <- idx2
-          group_less <- group1
-          idx_less <- idx1
-        }
+      
+      
+      #if one group has more than one non-NA value and the other group has no value
+      if (length(groups_with_data) >= 1 && length(groups_without_data) > 0) {
+        group_more <- Reduce(cbind,grouplist[which(counts > 1)])
+        idx_more <- unlist(idx[groups_with_data])
         
-        diff <- abs(count1-count2)
-        diff <- min(diff,ncol(group_less),ncol(group_more))
-        
-        random_select_col <- sample(idx_less,diff)
-        for (j in random_select_col) {
-          data[i,j] <- min(data[j],na.rm = T)
+        for (g in groups_without_data) {  # Iterate over each group without data
+          group_less <- grouplist[[g]]
+          idx_less <- idx[[g]]
+          
+          # Determine the difference in non-NA values between the groups
+          max_diff <- max(counts[counts!=0])
+          diff <- min(max_diff,ncol(group_less), min(sapply(grouplist, ncol)))
+          
+          # Find the minimum value in each column of group_less
+          col_min_values <- sapply(idx_less, function(j) min(data[, j], na.rm = TRUE))
+          
+          
+          
+          # Sort the minimum values and select the top n (smallest) values
+          top_n_mins <- sort(col_min_values, na.last = NA, decreasing = TRUE)[1:diff]
+          
+          # # Randomly assign top n values into missing columns
+          # random_select_col <- sample(idx_less, diff)
+          
+          for (j in 1:diff) {
+            col <- idx_less[j]
+            data[i, col] <- top_n_mins[j]
+          }
         }
-
-
       }
       
-      # Case 2: Both groups have less than 2 non-missing values
-      if (count1 <= 1 && count2 <= 1) {
+      # Case 2: All groups have less than 2 non-missing values
+      if (all(counts <= 1)) {
         data[i, ] <- NA  # Indicate to discard this row later
       }
       
-      # Case 3: Both groups have more than 1 non-missing value
-      # No action needed
+      # Case 3: All groups have more than 1 non-missing value (do nothing)
     }
     
-    # Discard rows with all NAs (case 2)
+    # Discard rows with all NAs (from case 2)
     data <- data[apply(data, 1, function(row) !all(is.na(row))), ]
-    
-    # Remove count columns before returning
-    data <- data[, !(names(data) %in% c("count_group1", "count_group2"))]
     
     return(data)
   }
   
+  # Apply imputation or cleaning based on the selection
+  df <- cbind(variables$CountData[, c(1, 2)], df)
   
-  df <- cbind(variables$CountData[,c(1,2)],df)
-  #selection
+  # Selection logic for imputation
   if (input$ImputationSelection == "Imputation") {
-    data_imputed <- impute_data(df, group1, group2,data_counts)
+    data_imputed <- impute_data(df, grouplist, count_non_na_per_group)
   } else if (input$ImputationSelection == "CleanData") {
-    data_imputed<-df[complete.cases(df[2:ncol(df)]),]
+    data_imputed <- df[complete.cases(df[2:ncol(df)]), ]
   } else {
-    data_imputed<-df
+    data_imputed <- df
   }
+  
   
   description <- data_imputed[c(1,2)]
   data_imputed <- data_imputed[-c(1,2)]
@@ -347,9 +343,6 @@ observeEvent(input$DETestType,{
   )
   
 
-
-  # Show computation time notification
-  #runtime <- round(normed_tcc$DEGES$execution.time[3], 2)
   
   updateProgressBar(
     session = session,
@@ -417,9 +410,6 @@ observeEvent(input$DETestType,{
     }
   )
   
-  # write.csv(variables$res, "test/res.csv")
-  # write.csv(variables$result,"test/result.csv")
-  
   # Render result table on the right top ----
   output$norm_resultTable <- DT::renderDataTable({
     if (nrow(variables$result) == 0) {
@@ -439,33 +429,11 @@ observeEvent(input$DETestType,{
         data,
         filter = "bottom",
         colnames = c("Uniprot ID" = 1),
-        # caption = tags$caption(
-        #   tags$li("Filter proteins by typing condictions (such as 2...5) in the filter boxes to filter numeric columns. ",
-        #           tags$b("Copy"),
-        #           ", ",
-        #           tags$b("Print"),
-        #           " and ",
-        #           tags$b("Download"),
-        #           " the filtered result for further analysis."
-        #   ),
-        #   tags$li(
-        #     HTML("<font color=\"#B22222\"><b>Protein ID</b></font> is colored according to FDR cut-off.")
-        #   )
-        # ),
+
         selection = 'single',
         extensions = c("Scroller", "Buttons"),
         option = list(
           dom = 'lfrtip',
-          # buttons =
-          #   list(
-          #     'copy',
-          #     'print',
-          #     list(
-          #       extend = 'collection',
-          #       buttons = c('csv', 'excel', 'pdf'),
-          #       text = 'Download'
-          #     )
-          #   ),
           deferRender = TRUE,
           scrollY = 400,
           scrollX = TRUE,
@@ -500,20 +468,29 @@ observeEvent(input$DETestType,{
   factors <- variables$factors
   
   selected = groupList[groupList[,idx] %in% factors,]
-  if(colnames(selected)[1] == "Sample"){
-    colnames(selected)[1] <- tolower(colnames(selected)[1])
-  }
+  # Ensure the first column is named "sample" in lowercase
+  colnames(selected)[1] <- ifelse(colnames(selected)[1] == "Sample", "sample", colnames(selected)[1])
+  
   
   #get the new group
-  variables$groupList2 <-
-    lapply(unique(selected[,idx]), function(x) {
-      selected[which(selected[,idx] == x), ]$sample
-    })
-  names(variables$groupList2) <- unique(selected[,idx])
-  data.cl <- rep(0, ncol(variables$CountData))
   
-  for (i in 1:length(variables$groupList2)) {
-    data.cl[unlist(lapply(variables$groupList2[[i]], convert2cl, df = variables$CountData))] <- names(variables$groupList2[i])
+  
+  # Generate new group list
+  variables$groupList2 <- split(selected$sample, selected[, idx])
+  # Initialize data.cl with zeros
+  data.cl <- numeric(ncol(variables$CountData))
+  
+  # variables$groupList2 <-
+  #   lapply(unique(selected[,idx]), function(x) {
+  #     selected[which(selected[,idx] == x), ]$sample
+  #   })
+  # names(variables$groupList2) <- unique(selected[,idx])
+  # data.cl <- rep(0, ncol(variables$CountData))
+  
+  #assign each sample column with its group information
+  for (i in seq_along(variables$groupList2)) {
+    index <- match(variables$groupList2[[i]], colnames(variables$CountData))
+    data.cl[index] <- names(variables$groupList2)[i]
   }
   data.cl <- data.cl[data.cl !=0]
   
@@ -544,7 +521,6 @@ observeEvent(input$norm_resultTable_rows_selected,{
   #get only the values columns
   data = data %>% dplyr::select(-contains(c("Log2Fold","p-value","FDR")))
   colInd = c(3:ncol(data))
-  # colInd = grep('^sig', colnames(data))
    data = data[, colInd]
   
   #get the row index when clicking the row
@@ -555,36 +531,38 @@ observeEvent(input$norm_resultTable_rows_selected,{
   group <- input$groups2
   idx <- as.numeric(grep(group, colnames(groupList)))
 
-  #factors <- variables$factors
+  factors <- variables$factors
+  selected = groupList[,idx] %in% factors
 
-  #selected = groupList[groupList[,idx] %in% factors,]
-
-  if(colnames(groupList)[1] == "Sample"){
-    colnames(groupList)[1] <- tolower(colnames(groupList)[1])
-  }
+  colnames(groupList)[1] <- "sample"
   
   #get the new group
-  variables$groupList <-
-    lapply(unique(groupList[,idx]), function(x) {
-      groupList[which(groupList[,idx] == x), ]$sample
-    })
+  variables$groupList <- split(groupList$sample, groupList[, idx])
+  # variables$groupList <-
+  #   lapply(unique(groupList[,idx]), function(x) {
+  #     groupList[which(groupList[,idx] == x), ]$sample
+  #   })
   
-  names(variables$groupList) <- unique(groupList[,idx])
+  # names(variables$groupList) <- unique(groupList[,idx])
   
   data.cl <- rep(0, ncol(variables$CountData))
-  
-  for (i in 1:length(variables$groupList)) {
-    data.cl[unlist(lapply(variables$groupList[[i]], convert2cl, df = variables$CountData))] <- names(variables$groupList[i])
+  for (i in seq_along(variables$groupList)) {
+    idx                                                                                                                                                       <- match(variables$groupList[[i]], colnames(variables$CountData))
+    data.cl[idx] <- names(variables$groupList)[i]
   }
+  
+  # for (i in 1:length(variables$groupList)) {
+  #   data.cl[unlist(lapply(variables$groupList[[i]], convert2cl, df = variables$CountData))] <- names(variables$groupList[i])
+  # }
   
   data.cl <- data.cl[data.cl!=0]
   
   #Plot the bar plot when clicked on specific row
   output$normboxplot <- renderPlotly({
-    expr = as.numeric(data[rowInd, ])
-    df = data.frame(samples = colnames(data), intensity = round(expr,digits = 2))
+    expr = as.numeric(data[rowInd, selected])
+    df = data.frame(samples = colnames(data)[selected], intensity = round(expr,digits = 2))
     xOrder <-
-      data.frame("name" = df$samples, "group" = data.cl)
+      data.frame("name" = df$samples, "group" = data.cl[selected])
     xOrderVector <- unique(xOrder[order(xOrder$group), ]$name)
     xform <- list(
       categoryorder = "array",
@@ -596,7 +574,7 @@ observeEvent(input$norm_resultTable_rows_selected,{
       data = df,
       x = ~samples,
       y = ~intensity,
-      color = as.factor(data.cl),
+      color = as.factor(data.cl[selected]),
       text = df$intensity,
       textposition = "outside",
       showlegend = FALSE,
@@ -631,7 +609,7 @@ output$DE_distributionUI <- renderUI({
       numericInput(
         inputId = "DE_binsize",
         label = "Bin Size",
-        value = 100
+        value = 1000
       ),
       do.call(actionBttn, c(
         list(
@@ -666,11 +644,10 @@ observeEvent(input$RunMovingSD,{
   showNotification("Plotting Distribution...", type = "message")
   
   
-  #retreive data
+  #retreive differential expression result
   data <- variables$result
   
-
-  
+  #Keep only intensity value columns
   data = data %>% dplyr::select(-contains(c("p-value","FDR")))
   colInd = c(3:ncol(data))
   # colInd = grep('^sig', colnames(data))
@@ -679,7 +656,7 @@ observeEvent(input$RunMovingSD,{
   n = ncol(data)
   
   
-  #reorder data
+  #reorder data based on mean intensity
   data$mean_intensity = rowMeans(data[-ncol(data)],na.rm = T)
   data <- data[order(data$mean_intensity,decreasing = F),]
   
@@ -688,12 +665,6 @@ observeEvent(input$RunMovingSD,{
   #get input binsize
   binsize <- input$DE_binsize
   
-  # Calculate rolling standard deviation
-  # rolling_sd <- rollapply(data$Log2Fold, 
-  #                         width = binsize, 
-  #                         by = 1, 
-  #                         FUN = sd, na.rm = T,
-  #                         align = 'right')
   
   # Calculate mean of the standard deviations of the next 100 proteins
   end <- (nrow(data))-binsize+1
@@ -701,14 +672,21 @@ observeEvent(input$RunMovingSD,{
     last <- i+binsize-1
     sd(data$Log2Fold[i:last],na.rm = T)
   })
+  
+  # For remaining proteins that bin size is not enough to cover, use the last moving SD for all larger proteins
   moving_sd_remain <- numeric(nrow(data) - end)
   moving_sd_remain[] <- moving_sd[length(moving_sd)]
   moving_sd <- c(moving_sd,moving_sd_remain)
+  
+  #store moving SDs
   data$movingSD <- moving_sd
   
   data_row_names=rownames(data)
   
+  #organize data set
   data_reordered <- data[match(rownames(variables$result),data_row_names), ]
+  #calculate log2fc z score
+  data_reordered$logFC_z_score <- data_reordered$Log2Fold/data_reordered$movingSD
   data_MSD=cbind(data_reordered,variables$result[,c("p-value","FDR")])
 
   
@@ -726,7 +704,12 @@ observeEvent(input$RunMovingSD,{
         xaxis = list(title = "log2 protein intensity"),
         yaxis = list(title = "Moving SD",
                      range=c(0,1))
+      )%>%plotly::config(
+      toImageButtonOptions = list(
+        format = "svg",
+        filename = input$volplttitle
       )
+    )
     
     p
   })
@@ -861,12 +844,33 @@ observeEvent(input$RunDistribution,{
   # colInd = grep('^sig', colnames(data))
   data = data[, colInd]
   
-  #get group information
-  group <- variables$groupList[choice]
+  #get group information ###change group structure
+  group <- variables$group
+  idx <- as.numeric(grep(group_select, colnames(group)))
+  
+  #Unify first column format
+  colnames(group)[1] <- ifelse(colnames(group)[1] == "Sample", "sample", colnames(group)[1])
+  
+  #get the new group
+  variables$SDwithinGroup <- split(group$sample, group[, idx])
+  
+  names(variables$SDwithinGroup) <- unique(group[,idx])
+  data.cl <- numeric(ncol(variables$CountData))
+  
+  for (i in seq_along(variables$SDwithinGroup)) {
+    ind <- match(variables$SDwithinGroup[[i]], colnames(variables$CountData))
+    data.cl[ind] <- names(variables$SDwithinGroup)[i]
+  }
+
+  
+  data.cl <- data.cl[data.cl!=0]
   
   #select correlated samples
-  selected_samples <- unlist(group)
+  selected <- variables$SDwithinGroup[choice]
+  selected_samples <- unlist(selected)
   
+  
+  #retrieve required data
   data <- data[selected_samples]
   n = ncol(data)
   
@@ -938,12 +942,14 @@ output$DE_volcanoPlot <- renderUI({
                      max = 2, 
                      step = 0.1,
                      value = 0.1),
+        htmlOutput("upPreview"),
         numericInput("log2fcDown", 
                      label = "Downregulated Log2-fold cutoff", 
                      min = -2, 
                      max = 2, 
                      step = 0.1,
                      value = -0.1),
+        htmlOutput("downPreview"),
         do.call(actionBttn, c(
           list(
             inputId = "RunVolcano",
@@ -966,7 +972,7 @@ output$DE_volcanoPlot <- renderUI({
             placeholder = "Input your protein accession number/Uniprot ID.\nOne protein each line"
           ),
           textInput(inputId = "volcxlab", 
-                    "X-axis Label", 
+                    "x-axis Label", 
                     value = paste("log<sub>2</sub>",txt)),
           sliderInput(
             "volcanoPointSize",
@@ -978,35 +984,35 @@ output$DE_volcanoPlot <- renderUI({
           ),
           spectrumInput(
             inputId = "downColor",
-            label = tagList("Down-regulated in G2", htmlOutput("downPreview")),
+            label = tagList("Down-regulated in the second group", htmlOutput("downPreview")),
             choices = list(
               list(
                 "#0000ff",
                 "green",
                 "black",
-                "white",
-                "blanchedalmond"
+                "grey30",
+                "white"
               ),
               as.list(brewer.pal(n = 9, name = "Blues")),
               as.list(brewer.pal(n = 9, name = "Greens")),
-              as.list(brewer.pal(n = 11, name = "Spectral"))
+              as.list(brewer.pal(n = 9, name = "Greys"))
             ),
             options = list(`toggle-palette-more-text` = "Show more")
           ),
           spectrumInput(
             inputId = "upColor",
-            label = tagList("Up-regulated in G2", htmlOutput("upPreview")),
+            label = tagList("Up-regulated in the second group", htmlOutput("upPreview")),
             choices = list(
               list(
                 "red",
                 "yellow",
                 "orange",
                 "white",
-                "darkblue"
+                "#0000ff"
               ),
               as.list(brewer.pal(n = 9, name = "Reds")),
               as.list(brewer.pal(n = 9, name = "Oranges")),
-              as.list(brewer.pal(n = 11, name = "Spectral"))
+              as.list(brewer.pal(n = 9, name = "Greys"))
             ),
             options = list(`toggle-palette-more-text` = "Show more")
           )
@@ -1100,11 +1106,9 @@ observeEvent(
       
       #remove the unnecessary column
       if (sigMetric == "p-value") {
-        # res = res[, 2:3]
         res[, 3] = NULL
         ylab = "-log10(p-value)"
       } else if (sigMetric == "FDR") {
-        # res = res[, c(2, 4)]
         res[, 2] = NULL
         ylab = "-log10(FDR)"
       }
@@ -1112,6 +1116,7 @@ observeEvent(
       
       res$color <- "None"
       
+      #Assign colors to each protein
       if(DownProt!=0){
         res[which(res$logfc <= DownCut & res$significance <= sigCutoff),]$color <- "Down"
       }else{
@@ -1154,15 +1159,6 @@ observeEvent(
       selectList <- row.names(res) %in% unlist(strsplit(x = input$labelProt, split = "[\r\n]"))
       top_prots <- res[selectList,]
       
-      
-      # # Find and label the top 10 proteins
-      # res$GN <- result$GN
-      # uprows <- res %>% filter(color %in% "Up")
-      # top10_up <- head(uprows[order(uprows$logfc,decreasing = T),], 5)
-      # downrows <- res %>% filter(color %in% "Down")
-      # top10_down <- head(downrows[order(downrows$logfc),], 5)
-      # top_prots <- rbind(top10_up,top10_down)
-      
       # Add gene labels for all of the top genes we found
       # here we are creating an empty list, and filling it with entries for each row in the dataframe
       # each list entry is another list with named items that will be used by Plot.ly
@@ -1196,13 +1192,13 @@ observeEvent(
         type = "scatter", 
         mode = "markers",
         color = ~level,
-        colors = c(input$downColor, "black", input$upColor), 
+        colors = c(input$downColor, "gray30", input$upColor), 
         text = result$GN,
         marker = list(size = input$volcanoPointSize,
                       opacity = 0.7),
         hovertemplate = paste("ID: %{text}",
                               "<br>Log2fold: %{x:.4f}", 
-                              "<br>sig. level: %{y}<extra></extra>"),
+                              "<br>sigficance: %{y}<extra></extra>"),
         key = ~annotation,
         showlegend = F
       )%>%layout(
@@ -1255,22 +1251,28 @@ output$protBarPlotInVolcano <- renderPlotly({
   # Get expression level (Normalized)
   expressionNor <-
     variables$result[row.names(variables$result) == prot_id, ]
-  colInd = c(3:ncol(expressionNor))
+  colInd = c(1:ncol(expressionNor))
   # colInd = grep('^sig', colnames(expressionNor))
-  expressionNor <- expressionNor[,colInd]
+  
   
   #get group list
   data.cl <- rep(0, ncol(variables$CountData))
   
-  for (i in 1:length(variables$groupList2)) {
-    data.cl[unlist(lapply(variables$groupList2[[i]], convert2cl, df = variables$CountData))] <- names(variables$groupList2[i])
+  for (i in seq_along(variables$groupList2)) {
+    idx <- match(variables$groupList2[[i]], colnames(variables$CountData))
+    data.cl[idx] <- names(variables$groupList2)[i]
   }
-  data.cl <- data.cl[data.cl !=0]
+  
+
+  #data.cl = data.cl[-c(1,2)]
+  colInd <- colInd[which(data.cl!=0)]
   
   #order the expression data
-  expression <- t(expressionNor[which(data.cl != 0)])
+  expression <- t(expressionNor[colInd])
+  #expression <- expressionNor[,3:ncol(expression)]
   expression <- round(expression,digits = 2)
   
+  data.cl = data.cl[data.cl!=0]
   xOrder <-
     data.frame("name" = row.names(expression), "group" = data.cl)
   xOrderVector <- unique(xOrder[order(xOrder$group), ]$name)
@@ -1345,7 +1347,7 @@ output$heatmapParameter <- renderUI({
       choices = c(
         "List" = "By_list",
         "FDR" = "By_FDR",
-        "Top" = "topPercent"
+        "P-val" = "By_pval"
       ),
       justified = TRUE,
       status = "primary"
@@ -1444,8 +1446,21 @@ output$heatmapParameter <- renderUI({
 # Preview proteins count -----
 observeEvent(input$heatmapFDR, {
   res <- variables$result
+  res <- res[!is.na(res$FDR), ]
   prot_count <-
     nrow(res[res$FDR <= input$heatmapFDR, ])
+  output$heatmapProteinPreview <- renderText({
+    paste0(
+      "Protein number: ",
+      prot_count
+    )
+  })
+})
+observeEvent(input$topProt, {
+  res <- variables$result
+  res <- res[!is.na(res$"p-value"), ]
+  prot_count <-
+    nrow(res[res$"p-value" <= input$topProt, ])
   output$heatmapProteinPreview <- renderText({
     paste0(
       "Protein number: ",
@@ -1465,26 +1480,24 @@ output$heatmapSelectProt <- renderUI({
       rows = 5,
       placeholder = "Input uniprot ID (first column in the dataset), one protein id per line."
     ),
-    "By_FDR" = tagList(
-      tagList(
-        sliderInput(
-          "heatmapFDR",
-          "FDR Cut-off",
-          min = 0.01,
-          max = 1,
-          value = 0.01
-        ),
-        textOutput("heatmapProteinPreview")
-      )
+    "By_FDR" = tagList(numericInput(
+      "heatmapFDR",
+      "FDR Cut-off",
+      min = 0.01,
+      max = 1,
+      value = 0.01
     ),
-    "topPercent" = numericInput(
+    textOutput("heatmapProteinPreview")),
+    "By_pval" = tagList(numericInput(
       inputId = "topProt",
-      label = "Top Selected Proteins",
-      value = 100,
+      label = "P value cut-off",
+      value = 0.05,
       min = 0,
-      max = nprotein,
-      step = 10
-    )
+      max = 1,
+      step = 0.01
+    ),
+    textOutput("heatmapProteinPreview"))
+    
   )
     
 })
@@ -1517,7 +1530,7 @@ createColorSelectors <- function(includeMiddle = FALSE) {
       label = "Low",
       choices = list(
         list(
-          "blue", "black", "gray30", "white", "blanchedalmond",
+          "blue", "black", "gray30", "white",
           "#2066a8", "#3594cc", "forestgreen"
         ),
         as.list(brewer.pal(n = 9, name = "Blues")),
@@ -1533,12 +1546,12 @@ createColorSelectors <- function(includeMiddle = FALSE) {
         label = "Middle",
         choices = list(
           list(
-            "white", "gray50", "blanchedalmond", "steelblue", 
+            "white", "gray50", "steelblue", 
             "#0000FF", "forestgreen"
           ),
           as.list(brewer.pal(n = 9, name = "Blues")),
           as.list(brewer.pal(n = 9, name = "Greens")),
-          as.list(brewer.pal(n = 11, name = "Spectral")),
+          as.list(brewer.pal(n = 8, name = "Accent")),
           as.list(brewer.pal(n = 8, name = "Dark2"))
         ),
         options = list(`toggle-palette-more-text` = "Show more")
@@ -1549,12 +1562,11 @@ createColorSelectors <- function(includeMiddle = FALSE) {
       label = "High",
       choices = list(
         list(
-          "red", "brown", "orange", "white", "steelblue", 
-          "forestgreen"
+          "red", "brown", "orange", "white"
         ),
-        as.list(brewer.pal(n = 9, name = "Blues")),
-        as.list(brewer.pal(n = 9, name = "Greens")),
-        as.list(brewer.pal(n = 11, name = "Spectral")),
+        as.list(brewer.pal(n = 9, name = "Reds")),
+        as.list(brewer.pal(n = 9, name = "Oranges")),
+        as.list(brewer.pal(n = 8, name = "Accent")),
         as.list(brewer.pal(n = 8, name = "Dark2"))
       ),
       options = list(`toggle-palette-more-text` = "Show more")
@@ -1652,10 +1664,9 @@ observeEvent(input$heatmapRun,{
     
     updateSliderInput(session = session,inputId = "heatmapFDR",value = input$heatmapFDR)
   }
-  else if(input$heatmapProtSelectType == "topPercent"){
-    topProt <- input$topProt
-    tempdata <- data[order(data$`p-value`), ]
-    sampleData <- tempdata[1:topProt,]
+  else if(input$heatmapProtSelectType == "By_pval"){
+    pvalCut <- input$topProt
+    sampleData <- data[which(data$'p-value' <= pvalCut),]
     
     updateNumericInput(session = session,inputId = "topProt",value = input$topProt)
   }
@@ -1692,12 +1703,9 @@ observeEvent(input$heatmapRun,{
   
   
   #merge datasets
-  sampleData <- rbind(df1,df2)
-  # sampleData <- merge(df1,df2,by = "row.names", all = TRUE, suffixes = c(".Up", ".Down"))
-  # rownames(sampleData) <- sampleData$Row.names
-  # sampleData <- sampleData[ , -1] # Remove the Row.names column
-  # sampleData <- sampleData[1:ncol(data)]
-  #colnames(sampleData) <- colnames(data)
+  overlapping_rows <- rownames(df1)[rownames(df1) %in% rownames(df2)]
+  non_overlapping_rows <- rownames(df2)[!rownames(df2) %in% rownames(df1)]
+  sampleData <- rbind(df1, df2[non_overlapping_rows, ])
   
   
   #update input values
@@ -1708,7 +1716,17 @@ observeEvent(input$heatmapRun,{
   #remove unnecessary columns
   sampleData = sampleData %>% dplyr::select(-contains(c("Log2Fold","p-value","FDR")))
   sampleData = sampleData[3:ncol(sampleData)]
-
+  
+  # filter by selected groups
+  groupList <- as.data.frame(variables$group)
+  group <- input$groups2
+  idx <- as.numeric(grep(group, colnames(groupList)))
+  
+  factors <- variables$factors
+  selected = groupList[,idx] %in% factors
+  
+  sampleData = sampleData[,selected]
+  
   #change to heatmap format
   mat = as.matrix(sampleData)
   
@@ -1721,9 +1739,8 @@ observeEvent(input$heatmapRun,{
   rmv = names(tab)[1:min(which(checkNA==0))]
   
   mat <- mat[complete.cases(mat),]
-  #mat = mat[-as.numeric(rmv),]
   
-  mat = t(scale(t(mat), center = T, scale = F)) # Only mean-centering
+  mat = t(scale(t(mat), center = T, scale = F))
   
   output$downloadHeatmap <- downloadHandler(
     filename = "heatmap.csv",

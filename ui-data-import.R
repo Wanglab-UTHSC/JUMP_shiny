@@ -4,12 +4,16 @@ fluidPage(
   includeCSS("www/style/theme.css"),
   fluidRow(column(
   3,
-  tabBox(
-    title = "",
-    id = "datasource",
-    width = NULL,
-    tabPanel(
-      tagList(icon("cloud-upload"), "Upload"),
+  #tabBox(
+  box(
+    #title = "",
+    #id = "datasource",
+    #width = NULL,
+    #tabPanel(
+      title = tagList(icon("cloud-upload"), "Upload"),
+      solidHeader = TRUE,
+      status = "primary",
+      width = NULL,
       radioButtons(
         "dataType",
         "Choose your file type",
@@ -17,9 +21,15 @@ fluidPage(
                     "jumpq",
                     "jump_batch")
       ),
+      radioButtons(
+        "intensityType",
+        "Type of intensity values",
+        choices = c("raw", "log2"), 
+        inline = T
+      ),
       fileInput(
         "uploadExpressionData",
-        "Upload Raw Data",
+        "Upload Data",
         accept = c("text/csv",
                    "text/comma-separated-values,text/plain",
                    ".csv"),
@@ -32,21 +42,21 @@ fluidPage(
         download = NA,
         target = "_blank"
       )
-    ),
-    tabPanel(
-      tagList(icon("folder-open"), "Example"),
-      uiOutput("dataSourceSelect"),
-      tags$p("Example JUMP raw data for illustration, containing 11 signals."),
+    #)#,
+    # tabPanel(
+      # tagList(icon("folder-open"), "Example"),
+      # uiOutput("dataSourceSelect"),
+      # tags$p("Example JUMP raw data for illustration, containing 11 signals."),
       
-      do.call(actionBttn, c(
-        list(
-          inputId = "ExpressionDataSample",
-          label = "Import data",
-          icon = icon("play")
-        ),
-        actionBttnParams
-      ))
-    )
+      # do.call(actionBttn, c(
+        # list(
+          # inputId = "ExpressionDataSample",
+          # label = "Import data",
+          # icon = icon("play")
+        # ),
+        # actionBttnParams
+      # ))
+    # )
   ),
   box(
     title = tagList(icon("tags"), "Meta information"),
@@ -63,11 +73,11 @@ fluidPage(
       placeholder = "No file has been uploaded."
     ),
     helpText("Text file in .tsv/.csv format, and the first column should be named as Sample."),
-    a(href = "data/meta_DIA.zip",
-      "Download example sample information table",
-      download = NA,
-      target = "_blank"
-    ),
+    # a(href = "data/meta_DIA.csv",
+      # "Download example sample information table",
+      # download = NA,
+      # target = "_blank"
+    # ),
     tags$br(),
     do.call(actionBttn, c(
       list(
@@ -87,7 +97,7 @@ fluidPage(
     uiOutput("groupSelection")
   ),
   box(
-    title = tagList(icon("info-circle"), "Summary"),
+    title = tagList(icon("info-circle"), "Data info"),
     solidHeader = TRUE,
     status = "info",
     width = NULL,
@@ -107,7 +117,7 @@ column(
     title = "",
     width = NULL,
     tabPanel(
-      title = tagList(icon("bar-chart"), "Intensity distribution"),
+      title = tagList(icon("bar-chart"), "Intensity Distribution"),
       uiOutput("sampleDistributionBoxPanel")
     ),
     # tabPanel(
@@ -115,14 +125,14 @@ column(
     #   uiOutput("lowCountFilterByCutoffUI")
     # ),
     tabPanel(
-      title = tagList(icon("area-chart"), "Density plot"),
+      title = tagList(icon("area-chart"), "Density Plot"),
       uiOutput("sampleDistributionDensityPanel")
     ),
-    tabPanel(title = tagList(icon("object-group"), "QQ plot"),
-             uiOutput("QQplot")),
+    # tabPanel(title = tagList(icon("object-group"), "QQ plot"),
+    #          uiOutput("QQplot")),
     tabPanel(title = tagList(icon("object-group"), "PCA"),
              uiOutput("pcaUI")),
-    tabPanel(title = tagList(icon("sitemap"), "Sample-sample distance"),
+    tabPanel(title = tagList(icon("sitemap"), "Sample Correlation"),
              uiOutput("dendUI"))
   )
 )))

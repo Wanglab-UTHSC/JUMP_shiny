@@ -16,7 +16,8 @@ fluidPage(
             label = "Normalization Method",
             #select between two normalization methods
             choices = c("Internal" = "internalNM",
-                        "Linear" = "linearNM")
+                        "Linear" = "linearNM",
+                        "Internal+Linear" = "internal_linearNM")
             
           )
         )
@@ -44,7 +45,7 @@ fluidPage(
     column(9,
            box(
              #show the data table after normalization
-             title = tagList(icon("table"), "Data Table"),
+             title = tagList(icon("table"), "Protein expression table"),
              width = NULL,
              solidHeader = TRUE,
              status = "primary",
@@ -63,7 +64,7 @@ fluidPage(
              ),
              tabPanel(title = tagList(icon("object-group"), "PCA"),
                       uiOutput("norm_pcaUI")),
-             tabPanel(title = tagList(icon("sitemap"), "Sample-sample distance"),
+             tabPanel(title = tagList(icon("sitemap"), "Sample Correlation"),
                       uiOutput("norm_dendUI"))
            ))
   )

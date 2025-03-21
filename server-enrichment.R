@@ -22,7 +22,7 @@ output$enrich_filter <- renderUI({
           "List" = "en_list",
           # "By name",
           "FDR" = "en_FDR",
-          "p-val" = "en_top"
+          "P-val" = "en_top"
         ),
         justified = TRUE,
         status = "primary"
@@ -30,14 +30,14 @@ output$enrich_filter <- renderUI({
       uiOutput("enrich_sigLevel"),
       numericInput("en_log2fcUp", 
                    label = "Upregulated Log2-fold cutoff", 
-                   min = -2, 
-                   max = 2, 
+                   min = 0, 
+                   max = 10, 
                    step = 0.1,
                    value = 0.3),
       numericInput("en_log2fcDown", 
                    label = "Downregulated Log2-fold cutoff", 
-                   min = -2, 
-                   max = 2, 
+                   min = -10, 
+                   max = 0, 
                    step = 0.1,
                    value = -0.3)
     )
@@ -57,27 +57,25 @@ output$enrich_sigLevel <- renderUI({
       rows = 5,
       placeholder = "Input protein's name (first column in the dataset), one protein id per line."
     ),
-    "en_FDR" = tagList(
-      tagList(
-        sliderInput(
-          "enrichmentFDR",
-          "FDR Cut-off",
-          min = 0.01,
-          max = 1,
-          value = 0.01
-        ),
-        textOutput("enrichmentProteinPreview")
-      )
+    "en_FDR" = tagList(numericInput(
+      "enrichmentFDR",
+      "FDR Cut-off",
+      min = 0.01,
+      max = 1,
+      value = 0.01,
+      step = 0.01
     ),
-    "en_top" = numericInput(
+    textOutput("enrichmentProteinPreview")),
+    "en_top" = tagList(numericInput(
       inputId = "en_topProt",
       label = "P-value cutoff",
       value = 0.05,
       min = 0,
       max = 1,
       step = 0.01
-    )
-  )
+    ),
+    textOutput("enrichmentProteinPreview")
+  ))
 })
 
 
@@ -89,10 +87,18 @@ observeEvent(input$enrichmentFDR, {
   output$enrichmentProteinPreview <- renderText({
     paste0(
       "Protein number: ",
-      prot_count,
-      " | Generation time: ~",
-      round(prot_count / 30, 2),
-      "s"
+      prot_count
+    )
+  })
+})
+observeEvent(input$en_topProt, {
+  res <- variables$result
+  prot_count <-
+    nrow(res[res$"p-value" <= input$en_topProt, ])
+  output$enrichmentProteinPreview <- renderText({
+    paste0(
+      "Protein number: ",
+      prot_count
     )
   })
 })
@@ -233,33 +239,10 @@ observeEvent(input$enrich_sigFilter,{
         data,
         filter = "bottom",
         colnames = c("Uniprot ID" = 1),
-        # caption = tags$caption(
-        #   tags$li("Filter proteins by typing condictions (such as 2...5) in the filter boxes to filter numeric columns. ",
-        #           tags$b("Copy"),
-        #           ", ",
-        #           tags$b("Print"),
-        #           " and ",
-        #           tags$b("Download"),
-        #           " the filtered result for further analysis."
-        #   ),
-        #   tags$li(
-        #     HTML("<font color=\"#B22222\"><b>Protein ID</b></font> is colored according to FDR cut-off.")
-        #   )
-        # ),
         selection = 'single',
         extensions = c("Scroller", "Buttons"),
         option = list(
           dom = 'lfrtip',
-          # buttons =
-          #   list(
-          #     'copy',
-          #     'print',
-          #     list(
-          #       extend = 'collection',
-          #       buttons = c('csv', 'excel', 'pdf'),
-          #       text = 'Download'
-          #     )
-          #   ),
           deferRender = TRUE,
           scrollY = 400,
           scrollX = TRUE,
@@ -353,9 +336,9 @@ observeEvent(input$runEnrichmentAnalysis,{
   
   #Load Data
   data <- variables$enrichedDataList
-  wholeData <- variables$result
-  gene <- row.names(data)
-  geneLst <- row.names(wholeData)
+  wholeData <- variables$CountData
+  gene <- data$GN
+  geneLst <- wholeData$GN
   
   #method selection
   method <- input$method
@@ -368,7 +351,7 @@ observeEvent(input$runEnrichmentAnalysis,{
   
   
   #Obtain whether key is ENSEMBL, GN, or PID
-  key = "UNIPROT"
+  key = "SYMBOL"
   pval = input$enrich_pvalCut
   qval = input$enrich_qvalCut
   minGSSize <- input$minGSSize
@@ -384,12 +367,8 @@ observeEvent(input$runEnrichmentAnalysis,{
   #translate to symbols
   tryCatch(
     {
-      gene_go <- bitr(gene, fromType=key, toType="SYMBOL", OrgDb=org)
-      gene_go <- gene_go$SYMBOL
-      gene_go <- gene_go[!duplicated(gene_go)]
-      geneLst_go <- bitr(geneLst, fromType=key, toType="SYMBOL", OrgDb=org)
-      geneLst_go <- geneLst_go$SYMBOL
-      geneLst_go <- geneLst_go[!duplicated(geneLst_go)]
+      gene_go <- bitr(gene, fromType=key, toType="UNIPROT", OrgDb=org)
+      geneLst_go <- bitr(geneLst, fromType=key, toType="UNIPROT", OrgDb=org)
     },
     error = function(e){
       #closeSweetAlert(session = session)
@@ -421,13 +400,15 @@ observeEvent(input$runEnrichmentAnalysis,{
     title = "Perform Enrichment Analysis",
     value = 70
   )
+  gene_go <- gene[!duplicated(gene)]
+  geneLst_go <- geneLst[!duplicated(geneLst)]
   
   if(method == "go_enrich"){
     tryCatch({
       ego <- enrichGO(gene = gene_go,
                       universe = geneLst_go,
                       OrgDb         = org,
-                      keyType       = 'SYMBOL',
+                      keyType       = key,
                       ont           = ont,
                       pvalueCutoff  = pval,
                       qvalueCutoff  = qval,
@@ -630,7 +611,7 @@ output$EN_dotPlot <- renderUI({
   if(enRun$enRunValue){
     fluidRow(column(
       12,
-      plotOutput("bubbleplotObject")%>% withSpinner()
+      plotOutput("bubbleplotObject",height = 800)%>% withSpinner()
     ))
   }else if(enRun$enRunValue && nrow(variables$en_result) == 0){
     helpText("No enriched term found.")
@@ -657,7 +638,7 @@ output$EN_network <- renderUI({
   if(enRun$enRunValue){
     fluidRow(column(
       12,
-      plotOutput("enrichmentMap")%>% withSpinner()
+      plotOutput("enrichmentMap",height = 800)%>% withSpinner()
     ))
   }else if(enRun$enRunValue && nrow(variables$en_result) == 0){
     helpText("No enriched term found.")

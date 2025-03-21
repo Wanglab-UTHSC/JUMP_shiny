@@ -29,11 +29,11 @@
 5. **Visualization of Enrichment Analysis Results**
 
     JUMP shiny provides two plots for visualizing the results of the enrichment analysis:  
-    - Bar Plot: This plot displays the most significantly enriched pathways, processes, or functions in a clear and easy-to-interpret bar graph format. Each bar represents a specific enriched category, with the length of the bar corresponding to the number of proteins in the enriched pathway. The color of each bar represents the significant level of the enriched pathway (i.e., adjusted *p* value)  
+    - Bubble Plot: This plot displays the most significantly enriched pathways, processes, or functions in a clear and easy-to-interpret dot graph format. Each bubble represents a specific enriched category, with the size of the bubble corresponding to the number of proteins in the enriched pathway. The color of each dot represents the significant level of the enriched pathway (i.e., adjusted *p* value)  
     
-    ![barplot](../www/images/enrich_dot.png){width=90%}
+    ![barplot](../www/images/enrich_dot.png){width=50%}
     
     - Network Map: This plot presents a network map that illustrates the relationships and interactions between the enriched pathways or functions. The network map helps in understanding the interconnectedness of various biological processes and identifying key regulatory nodes.
 
 
-    ![network](../www/images/enrich_net.png){width=90%}
+    ![network](../www/images/enrich_net.png){width=50%}

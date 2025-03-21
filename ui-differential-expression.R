@@ -19,11 +19,24 @@ fluidPage(
     uiOutput("compSelect"),
     uiOutput("group3"),
     uiOutput("selectInputContainer"),
-    # uiOutput("groups3"),
-    # uiOutput("groups4"),
-    # selectInput("metric2", label = "Select the measure of significance", choice = list("p-value" = "p-value", "FDR" = "FDR"), selected = 1),
-    # numericInput("cutoff2", label = "Significance level", min = 0, max = 1, step = 0.01, value = 0.05),
-    # numericInput("logfc2", label = "Log2-fold cutoff", value = 1),
+    radioButtons(
+      inputId = "ImputationSelection",
+      label = "Missing Value Imputation",
+      choices = c("No Imputation" = "NA","Imputation" = "Imputation","Data without NAs"="CleanData"),
+      selected = "NA"
+    ),
+    conditionalPanel(
+      condition = "input.ImputationSelection == 'Imputation'",
+      numericInput(
+        inputId = "filterValue",
+        label = "Enter Filter Value",
+        value = 1
+      )
+    ),
+    # Popovers for each radio button choice
+    radioTooltip("ImputationSelection",choice = "NA",title = "No imputation on whole data"),
+    radioTooltip("ImputationSelection",choice = "Imputation",title = "See documentation for details"),
+    radioTooltip("ImputationSelection",choice = "CleanData",title = "No imputation and perform DE only on data without NAs"),
     do.call(actionBttn, c(
       list(
         inputId = "DETestType",
@@ -43,12 +56,6 @@ column(
     status = "primary",
     uiOutput("DEResultTable")
   ), 
-  # tabsetPanel(
-  #   id = "plots",
-  #   tabPanel("Volcano Plot", uiOutput("DE_volcanoPlot")),
-  #   tabPanel("Heatmap", uiOutput("DE_dendUI")),
-  #   tabPanel("Density Plot", uiOutput("DE_distributionUI"))
-  # )
   tabBox(
     title = "",
     width = NULL,
@@ -64,7 +71,7 @@ column(
       title = tagList(icon("bar-chart"), "Volcano Plot"),
       uiOutput("DE_volcanoPlot")
     ),
-    tabPanel(title = tagList(icon("sitemap"), "Hierarchical Clustering"),
+    tabPanel(title = tagList(icon("sitemap"), "Heatmap"),
              uiOutput("DE_dendUI"))
 
 

@@ -1,58 +1,15 @@
-# JUMP Shiny Manual
+## Welcome to JUMP Shiny
 
-## Introduction
+![home](../www/images/home.png){width = 50%}
 
-Welcome to **JUMP shiny**, a comprehensive web platform designed for mass spectrometry-based proteomics. JUMP Shiny encompasses a wide range of analyses, including experimental design, data normalization, differential expression, and enrichment analysis. JUMP shiny provides intuitive tools and visualizations to facilitate your proteomics data analysis. This manual will guide you through the user interface, functionalities, and detailed steps involved in performing a comprehensive proteomic analysis using JUMP shiny. 
-
-------------------------------------------------------------------------
-
-## Getting Started
-
----
-### Accessing JUMP Shiny
-
-To begin your proteomic analysis, please visit the [JUMP shiny webplatform](https://jumpshiny.stjude.org). If you would like to process large datasets, you can use the local version available on [GitHub](https://github.com/Wanglab-UTHSC/JUMP_shiny) for more efficient processing and analysis.
-
-### User Interface Overview
-
-## Exploratory Analysis
----
-
-`Exploaratory Analysis` section is designed for uploading and visualizing the dataset you upload to JUMP shiny.
-
-1.  **Dataset Summarization:** Provides an overview of the dataset, including key statistics and characteristics.
-2.  **Sample Distribution Plot:** Offers a visual representation of sample distribution for quality control.
-3.  **Heatmap and PCA Graphs:** Displays significant values in the original data through heatmap and Principal Component Analysis (PCA) graphs.
-
-## Batch Normalization and Covariates Analysis
-
----
-These two sections focus on data normalization and covariate correction, offering various plots to visualize the results after normalization.
+JUMP Shiny is a comprehensive web platform designed for mass spectrometry-based proteomics analysis. JUMP Shiny offers a wide range of analytical tools, including experimental design, exploratory analysis, batch normalization, differential expression and enrichment pathway analysis.
+This platform provides intuitive visualizations and functionalities that facilitate in-depth exploration of proteomics data.
+The tutorial tab will guide you through user interface, functionalities, and detailed steps to perform the analysis.
 
 
-## Differential Expression Analysis
----
+### Acknowledgement
+Part of the code was adapted from project [TCC-GUI]("https://github.com/swsoyee/TCC-GUI") under MIT license. We truly appreciate and respect their contributions.
 
-This section allows for differential expression analysis with detailed tables and interactive plots:
-
-1.  `Volcano Plot`: Visualize fold changes and statistical significance of differentially expressed genes.
-2.  `Heatmap`: Interactive heatmap displaying expression patterns of proteins.
-In addition, you can explore sample variation through standard deviation analysis. 
-
-## Enrichment Analysis
-
----
-Enrichment analysis is used to identify biological pathways, molecular functions, and cellular components that are significantly overrepresented in a given set of proteins. 
-
-
-
-## Additional Tabs
----
-
-Explore other tabs for more details and specific requirements related to your protein analysis.
-
-## About
----
-If you have any questions or suggestions, please contact:  
-Aijun Zhang: azhang97@stjude.org or azhang16@uthsc.edu  
-Xusheng Wang: xusheng.wang@stjude.org or xwang39@uthsc.edu
+### Contact Information 
+Aijun Zhang: azhang16@uthsc.edu  
+Xusheng Wang: xwang39@uthsc.edu
