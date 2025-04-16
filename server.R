@@ -9,6 +9,9 @@ source(file = "global.R",
        local = TRUE,
        encoding = "UTF-8")
 
+shinyOptions(shiny.fullstacktrace=TRUE) 
+shinyOptions(shiny.trace = TRUE)
+
 # Define server
 shinyServer(function(input, output, session) {
   
@@ -75,6 +78,8 @@ shinyServer(function(input, output, session) {
     corrected_data = data.frame(),
     reportFile = NULL
   )
+  # balk = testing <- invokes immediate stack trace
+
   source(file = "server-blockRand.R",
          local = TRUE,
          verbose = FALSE,

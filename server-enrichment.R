@@ -1,12 +1,14 @@
 #server-enrichment.R
 
 library(clusterProfiler)
+options(clusterProfiler.download.method = "wget")
 library(enrichplot)
 library(ggnewscale)
 library(org.Hs.eg.db)
 library(org.Mm.eg.db)
 library(ggplot2)
 library(plotly)
+
 
 FilterRun <- reactiveValues(FilterRunValue = FALSE)
 enRun <- reactiveValues(enRunValue = FALSE)
@@ -106,20 +108,20 @@ observeEvent(input$en_topProt, {
 
 observeEvent(input$enrich_sigFilter,{
   
-  progressSweetAlert(
-    session = session,
-    id = "filterProgress",
-    title = "Load in parameter",
-    display_pct = TRUE,
-    value = 0
-  )
+  # progressSweetAlert(
+  #   session = session,
+  #   id = "filterProgress",
+  #   title = "Load in parameter",
+  #   display_pct = TRUE,
+  #   value = 0
+  # )
   
-  updateProgressBar(
-    session = session,
-    id = "filterProgress",
-    title = "Processing data",
-    value = 30
-  )
+  # updateProgressBar(
+  #   session = session,
+  #   id = "filterProgress",
+  #   title = "Processing data",
+  #   value = 30
+  # )
   #Obtain filter parameters
   data <- variables$result
   res <- variables$res
@@ -131,14 +133,14 @@ observeEvent(input$enrich_sigFilter,{
       selectList <- row.names(data) %in% unlist(strsplit(x = input$enrichmentTextList, split = "[\r\n]"))
       sampleData <- data[selectList,]
       
-      updateTextAreaInput(session = session, inputId = "enrichmentTextList",value = input$heatmapTextList)
+      #updateTextAreaInput(session = session, inputId = "enrichmentTextList",value = input$heatmapTextList)
     }
     else if(input$enrich_filterSelectType == "en_FDR"){
       selectList <-
         row.names(data) %in% row.names(res[res$FDR <= input$enrichmentFDR, ])
       sampleData <- data[selectList,]
       
-      updateSliderInput(session = session,inputId = "enrichmentFDR",value = input$enrichmentFDR)
+      #updateSliderInput(session = session,inputId = "enrichmentFDR",value = input$enrichmentFDR)
     }
     else if(input$enrich_filterSelectType == "en_top"){
       pvalCut <- input$en_topProt
@@ -146,7 +148,7 @@ observeEvent(input$enrich_sigFilter,{
       #   row.names(data) %in% row.names(res[res$`p-value`<=pvalCut,])
       sampleData <- data[which(data$'p-value' <= pvalCut),]
       
-      updateNumericInput(session = session,inputId = "en_topProt",value = input$en_topProt)
+      #updateNumericInput(session = session,inputId = "en_topProt",value = input$en_topProt)
     }
     else{
       sendSweetAlert(
@@ -158,12 +160,12 @@ observeEvent(input$enrich_sigFilter,{
       return()
     }
     
-    updateProgressBar(
-      session = session,
-      id = "filterProgress",
-      title = "Data Selected",
-      value = 50
-    )
+    # updateProgressBar(
+    #   session = session,
+    #   id = "filterProgress",
+    #   title = "Data Selected",
+    #   value = 50
+    # )
     
     upCut <- input$en_log2fcUp
     downCut <- input$en_log2fcDown
@@ -198,24 +200,24 @@ observeEvent(input$enrich_sigFilter,{
   }
   
   
-  
-  updateProgressBar(
-    session = session,
-    id = "filterProgress",
-    title = "Log2 fold change applied",
-    value = 50
-  )
+  # 
+  # updateProgressBar(
+  #   session = session,
+  #   id = "filterProgress",
+  #   title = "Log2 fold change applied",
+  #   value = 50
+  # )
   
   
   variables$enrichedDataList <- sampleData
   #write.csv(sampleData,"test/filteredResult.csv")
   
-  updateProgressBar(
-    session = session,
-    id = "filterProgress",
-    title = "Output data table",
-    value = 80
-  )
+  # updateProgressBar(
+  #   session = session,
+  #   id = "filterProgress",
+  #   title = "Output data table",
+  #   value = 80
+  # )
   
   output$downLoadFilTable <- downloadHandler(
     filename = "pre_enrichment_filter.csv",
@@ -260,22 +262,22 @@ observeEvent(input$enrich_sigFilter,{
   },server = TRUE)
   
   
-  updateProgressBar(
-    session = session,
-    id = "filterProgress",
-    title = "Data Saved",
-    value = 100
-  )
+  # updateProgressBar(
+  #   session = session,
+  #   id = "filterProgress",
+  #   title = "Data Saved",
+  #   value = 100
+  # )
   
   FilterRun$FilterRunValue <- input$enrich_sigFilter
   
-  closeSweetAlert(session = session)
-  sendSweetAlert(
-    session = session,
-    title = "DONE",
-    text = "Data filtering done.",
-    type = "success"
-  )
+  # closeSweetAlert(session = session)
+  # sendSweetAlert(
+  #   session = session,
+  #   title = "DONE",
+  #   text = "Data filtering done.",
+  #   type = "success"
+  # )
   
 })
 
@@ -285,13 +287,11 @@ output$preEnrichResultTable <- renderUI({
   if(FilterRun$FilterRunValue){
     tagList(fluidRow(column(
       12,
-      downloadButton("downLoadFilTable", "Download Filtered Table (CSV)")
-    )),
-    tags$br(),
-    fluidRow(column(
-      12, 
+      downloadButton("downLoadFilTable", "Download Filtered Table (CSV)"),
+      tags$br(),
       DT::dataTableOutput('preEnrichmentTable') %>% withSpinner()
-    )))} else {
+    ))
+    )} else {
       helpText("Click [Run Significance Filter] to obtain Filtered Table.")
     }
 })
@@ -319,21 +319,21 @@ output$go_enrich_select <- renderUI({
 
 observeEvent(input$runEnrichmentAnalysis,{
   
-  progressSweetAlert(
-    session = session,
-    id = "enrichmentProgress",
-    title = "Loading parameter",
-    display_pct = TRUE,
-    value = 0
-  )
-  
-  updateProgressBar(
-    session = session,
-    id = "enrichmentProgress",
-    title = "Loading data",
-    value = 30
-  )
-  
+  # progressSweetAlert(
+  #   session = session,
+  #   id = "enrichmentProgress",
+  #   title = "Loading parameter",
+  #   display_pct = TRUE,
+  #   value = 0
+  # )
+  # 
+  # updateProgressBar(
+  #   session = session,
+  #   id = "enrichmentProgress",
+  #   title = "Loading data",
+  #   value = 30
+  # )
+  # 
   #Load Data
   data <- variables$enrichedDataList
   wholeData <- variables$CountData
@@ -357,16 +357,17 @@ observeEvent(input$runEnrichmentAnalysis,{
   minGSSize <- input$minGSSize
   maxGSSize <- input$maxGSSize
   
-  updateProgressBar(
-    session = session,
-    id = "enrichmentProgress",
-    title = "Convert keytypes",
-    value = 50
-  )
+  # updateProgressBar(
+  #   session = session,
+  #   id = "enrichmentProgress",
+  #   title = "Convert keytypes",
+  #   value = 50
+  # )
   
   #translate to symbols
   tryCatch(
     {
+      showNotification("Converting mapping ID key type", type = "message")
       gene_go <- bitr(gene, fromType=key, toType="UNIPROT", OrgDb=org)
       geneLst_go <- bitr(geneLst, fromType=key, toType="UNIPROT", OrgDb=org)
     },
@@ -394,15 +395,16 @@ observeEvent(input$runEnrichmentAnalysis,{
     kegg_org = "rno"
   }
   
-  updateProgressBar(
-    session = session,
-    id = "enrichmentProgress",
-    title = "Perform Enrichment Analysis",
-    value = 70
-  )
+  # updateProgressBar(
+  #   session = session,
+  #   id = "enrichmentProgress",
+  #   title = "Perform Enrichment Analysis",
+  #   value = 70
+  # )
   gene_go <- gene[!duplicated(gene)]
   geneLst_go <- geneLst[!duplicated(geneLst)]
   
+  showNotification("Enrichment analysis starting...", type = "message",duration = 20)
   if(method == "go_enrich"){
     tryCatch({
       ego <- enrichGO(gene = gene_go,
@@ -485,12 +487,12 @@ observeEvent(input$runEnrichmentAnalysis,{
   }
   
   
-  updateProgressBar(
-    session = session,
-    id = "enrichmentProgress",
-    title = "Output Result",
-    value = 90
-  )
+  # updateProgressBar(
+  #   session = session,
+  #   id = "enrichmentProgress",
+  #   title = "Output Result",
+  #   value = 90
+  # )
   
   shinyCatch(
     variables$en_table <- variables$en_result@result,
@@ -503,75 +505,42 @@ observeEvent(input$runEnrichmentAnalysis,{
       write.csv(variables$en_table, file)
     }
   )
-  
-  output$afterEnrichResultTable <- DT::renderDataTable({
-    if (nrow(variables$en_result) == 0) {
-      DT::datatable(variables$en_result@result)
-    }else{
-      data <- variables$en_result
-      data <- data@result
-      data$`pvalue` = formatC(data$`pvalue`, format = "e", digits = 3)
-      data$`qvalue` = formatC(data$`qvalue`, format = "e", digits = 3)
-      data$`p.adjust` = formatC(data$`p.adjust`, format = "e", digits = 3)
-      DT::datatable(
-        data = data,
-        filter = "bottom",        
-        # caption = tags$caption(
-        #   tags$li("Filter conditions in the bottom. ",
-        #           tags$b("Copy"),
-        #           ", ",
-        #           tags$b("Print"),
-        #           " and ",
-        #           tags$b("Download"),
-        #           " the enrichment result for further analysis."
-        #   )
-        # ),
-        selection = 'single',
-        extensions = c("Scroller", "Buttons"),
-        option = list(
-          dom = 'lfrtip',
-          # buttons =
-          #   list(
-          #     'copy',
-          #     'print',
-          #     list(
-          #       extend = 'collection',
-          #       buttons = c('csv', 'excel', 'pdf'),
-          #       text = 'Download'
-          #     )
-          #   ),
-          deferRender = TRUE,
-          scrollY = 400,
-          scrollX = TRUE,
-          scroller = TRUE,
-          
-          pageLength = 5,
-          searchHighlight = TRUE,
-          orderClasses = TRUE,
-          columnDefs = list(
-            list(visible = TRUE, targets = -1)
-          )
-        )
-      )
-    }
+  table <- fortify(ego,showCategory = length(ego@result$ID))
+  output$afterEnrichResultTable <- DT::renderDataTable({ 
+    data <- table
+    data$`pvalue` = formatC(data$`pvalue`, format = "e", digits = 3)
+    data$`qvalue` = formatC(data$`qvalue`, format = "e", digits = 3)
+    data$`p.adjust` = formatC(data$`p.adjust`, format = "e", digits = 3)
+    DT::datatable(data, 
+                  options = list( 
+                    dom = 'lfrtip', 
+                    scrollX = TRUE,
+                    scrollY = 400,
+                    scroller = TRUE,
+                    pageLength = 5, 
+                    searchHighlight = TRUE, 
+                    autoWidth = TRUE 
+                  ), 
+                  rownames = FALSE 
+    ) 
   },server = TRUE)
   
-  enRun$enRunValue <- input$runEnrichmentAnalysis
+  enRun$enRunValue <- TRUE
   
-  updateProgressBar(
-    session = session,
-    id = "enrichmentProgress",
-    title = "Output Result",
-    value = 100
-  )
-  
-  closeSweetAlert(session = session)
-  sendSweetAlert(
-    session = session,
-    title = "DONE",
-    text = "Enrichment analysis done.",
-    type = "success"
-  )
+  # updateProgressBar(
+  #   session = session,
+  #   id = "enrichmentProgress",
+  #   title = "Output Result",
+  #   value = 100
+  # )
+  # 
+  # closeSweetAlert(session = session)
+  # sendSweetAlert(
+  #   session = session,
+  #   title = "DONE",
+  #   text = "Enrichment analysis done.",
+  #   type = "success"
+  # )
   
 })
 
@@ -580,11 +549,8 @@ output$afterEnrichResultUI <- renderUI({
   if(enRun$enRunValue){
     tagList(fluidRow(column(
       12,
-      downloadButton("downloadEnResultTable", "Download Enrichment Result Table (CSV)")
-    )),
-    tags$br(),
-    fluidRow(column(
-      12, 
+      downloadButton("downloadEnResultTable", "Download Enrichment Result Table (CSV)"),
+      tags$br(),
       DT::dataTableOutput('afterEnrichResultTable') %>% withSpinner()
     )))
   }else{
@@ -647,3 +613,4 @@ output$EN_network <- renderUI({
     helpText("No data to plot. Run enrichment analysis first.")
   }
 })
+

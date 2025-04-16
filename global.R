@@ -8,7 +8,7 @@
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load("devtools","shiny","dplyr","shinycssloaders","ggplot2","heatmaply","shinyBS","shinyjs","scales","data.table","RColorBrewer","markdown","utils","shinyWidgets",
                "tidyr","shinydashboard","plotly","gplots","DT","cluster","fresh","shinythemes","limma","clusterProfiler","scatterD3","curl","org.Mm.eg.db", "org.Hs.eg.db",
-               "org.Rn.eg.db","glue","spsComps","bookdown","WGCNA","writexl")
+               "org.Rn.eg.db","glue","spsComps","bookdown","WGCNA")
 
 
 
