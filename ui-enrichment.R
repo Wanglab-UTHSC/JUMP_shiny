@@ -44,9 +44,7 @@ fluidPage(
       "method",
       "Method",
       choices = c("GO" = "go_enrich",
-                  "Kegg" = "kegg_enrich",
-                  # "GSEA" = "gsea_enrich",
-                  "gseKEGG" = "gseKegg")
+                  "Kegg" = "kegg_enrich")
     ),
     uiOutput("go_enrich_select"),
     # selectInput(

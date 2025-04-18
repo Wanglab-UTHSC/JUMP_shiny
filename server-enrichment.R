@@ -300,7 +300,7 @@ output$preEnrichResultTable <- renderUI({
 #Parameter selection if enrich GO or GSE is selected
 output$go_enrich_select <- renderUI({
   method <- input$method
-  if(method == "go_enrich"||method =="gsea_enrich"){
+  if(method == "go_enrich"){
     selectInput("ont", "Ontology",
                 choices = c(
                   "ALL" = "ALL",

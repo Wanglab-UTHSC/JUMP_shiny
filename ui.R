@@ -7,6 +7,9 @@ library(fresh)
 #TCC-GUI(https://github.com/swsoyee/TCC-GUI)
 
 tagList(
+  tags$head(
+  tags$link(rel = "icon", type = "image/png", href = "images/TOC.png")
+),
   dashboardPage(
     header = dashboardHeader(
         tags$li(

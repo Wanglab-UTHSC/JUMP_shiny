@@ -2,7 +2,7 @@ library(shiny)
 
 .libPaths( c( "./lib" , .libPaths() ) )
 
-options(shiny.fullstacktrace=TRUE)
+#options(shiny.fullstacktrace=TRUE)
 
 captureStackTraces <- function(expr) {
   withCallingHandlers(
@@ -16,6 +16,6 @@ captureStackTraces <- function(expr) {
   )
 }
 
-options(shiny.fullstacktrace=TRUE) 
-options(shiny.trace = TRUE)
+#options(shiny.fullstacktrace=TRUE) 
+#options(shiny.trace = TRUE)
 runApp(launch.browser=0, port=3978)

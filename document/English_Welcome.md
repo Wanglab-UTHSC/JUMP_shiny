@@ -7,9 +7,18 @@ This platform provides intuitive visualizations and functionalities that facilit
 The tutorial tab will guide you through user interface, functionalities, and detailed steps to perform the analysis.
 
 
-### Acknowledgement
-Part of the code was adapted from project [TCC-GUI]("https://github.com/swsoyee/TCC-GUI") under MIT license. We truly appreciate and respect their contributions.
 
 ### Contact Information 
 Aijun Zhang: azhang16@uthsc.edu  
 Xusheng Wang: xwang39@uthsc.edu
+
+Wang Lab@2025: [Lab Website](https://wang.lab.uthsc.edu/)
+
+### Acknowledgement
+Part of the code was adapted from project [TCC-GUI](https://github.com/swsoyee/TCC-GUI) under MIT license. We truly appreciate and respect their contributions.
+
+
+
+
+
+

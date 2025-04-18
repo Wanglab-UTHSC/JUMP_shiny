@@ -79,68 +79,68 @@ observeEvent(input$uploadExpressionData, {
       }
     }
   )   
-      
-      
-
-      new <- rawdata
-      
-      
-      tryCatch({
-        #make the first column as row name
-        rn <- rawdata$'pid'
-        
-        #check if the accession number is already obtained
-        if(sum(grepl('\\|', rn))){
-          rawdata2 <- rawdata %>% separate("pid", into = c("id1", "pid","id2"), sep = "\\|")
-          pid = rawdata2$pid
-          new <- data.frame(pid, rawdata)
-          new <- new[-2]
-        }
-      },
-      error = function(e){
-        sendSweetAlert(
-          session = session,
-          title = "Accession number or protein id error. Check your first column.",
-          text = as.character(message(e)),
-          type = "error"
-        )
-        return()
-      })
-      
-      
-      #Get unique row names
-      validate(dupValidate(new))
-      new <- new[!duplicated(new$pid),]
-      variables$dup <- nrow(new[duplicated(new$pid),])
-      row.names(new) <- new$pid
-      new <- new[,-1]
-      
-      
-      #save the raw data as a global variable
-      if(input$intensityType  == "log2"){
-        data <- new[,3:ncol(new)]
-        data_trans <- 2^data
-        temp <- cbind(new[,1:2], data_trans)
-        new <- temp
-      }
-      
-      variables$CountData <- new
-
-      dataImportCheck$importRunValue <- FALSE
-
-      showNotification("Data uploaded successfully.", type = "message")
-
+  
+  
+  
+  new <- rawdata
+  
+  
+  tryCatch({
+    #make the first column as row name
+    rn <- rawdata$'pid'
+    
+    #check if the accession number is already obtained
+    if(sum(grepl('\\|', rn))){
+      rawdata2 <- rawdata %>% separate("pid", into = c("id1", "pid","id2"), sep = "\\|")
+      pid = rawdata2$pid
+      new <- data.frame(pid, rawdata)
+      new <- new[-2]
+    }
+  },
+  error = function(e){
+    sendSweetAlert(
+      session = session,
+      title = "Accession number or protein id error. Check your first column.",
+      text = as.character(message(e)),
+      type = "error"
+    )
+    return()
+  })
+  
+  
+  #Get unique row names
+  validate(dupValidate(new))
+  new <- new[!duplicated(new$pid),]
+  variables$dup <- nrow(new[duplicated(new$pid),])
+  row.names(new) <- new$pid
+  new <- new[,-1]
+  
+  
+  #save the raw data as a global variable
+  if(input$intensityType  == "log2"){
+    data <- new[,3:ncol(new)]
+    data_trans <- 2^data
+    temp <- cbind(new[,1:2], data_trans)
+    new <- temp
+  }
+  
+  variables$CountData <- new
+  
+  dataImportCheck$importRunValue <- FALSE
+  
+  showNotification("Data uploaded successfully.", type = "message")
+  
 })
 
-datasetInput <- reactive({
-  variables$CountData
-})
+# datasetInput <- reactive({
+#   variables$CountData
+# })
 
 
 # Render a table of raw count data, adding color ----
 
 output$table <- DT::renderDataTable({
-  df <- datasetInput()
+  df <- variables$CountData
   temp <- df[,3:ncol(variables$CountData)]
   temp <- round(temp,digits = 0)
   df <- cbind(variables$CountData[,c(1,2)],temp)
@@ -168,7 +168,7 @@ output$table <- DT::renderDataTable({
 # Render DataTable of row data count ----
 
 output$emptyTable <- renderUI({
-  if (nrow(datasetInput()) == 0) {
+  if (nrow(variables$CountData) == 0) {
     tags$p("No data to show. Download", tags$code("Example"), "or", tags$code("Upload"), "your own dataset.")
   } else {
     DT::dataTableOutput("table")
@@ -176,137 +176,85 @@ output$emptyTable <- renderUI({
 })
 
 observeEvent(input$confirmedGroupList, {
-  if (nrow(datasetInput()) == 0) {
-    sendSweetAlert(
-      session = session,
-      title = "ERROR",
-      text = "Please input raw data table!",
-      type = "error"
-    )
-    return()
-  }
-  if (is.null(input$uploadGroup)) {
-    sendSweetAlert(
-      session = session,
-      title = "ERROR",
-      text = "Please input group information!",
-      type = "error"
-    )
-    return()
+  dataImportCheck$importRunValue <- FALSE
+  # if (nrow(variables$CountData) == 0) {
+  #   sendSweetAlert(
+  #     session = session,
+  #     title = "ERROR",
+  #     text = "Please input raw data table!",
+  #     type = "error"
+  #   )
+  #   return()
+  # }
+  # if (is.null(input$uploadGroup)) {
+  #   sendSweetAlert(
+  #     session = session,
+  #     title = "ERROR",
+  #     text = "Please input group information!",
+  #     type = "error"
+  #   )
+  #   return()
+  # }
+  
+  group <- data.frame(fread(input$uploadGroup$datapath, header = T, blank.lines.skip = T))
+  group_no_header <- data.frame(fread(input$uploadGroup$datapath,header = FALSE))
+  
+  showNotification("Group information uploaded successfully.", type = "message")
+  
+  #store group information
+  colnames(group)[1] <- "sample"
+  variables$group <- group
+  
+  
+  # variables$group_no_header <- group_no_header
+  group_no_header <- group_no_header[-1,]
+  groupName <- colnames(group)
+  
+  
+  # Create groupList
+  variables$groupList <- split(group_no_header$V1, group_no_header$V2)
+  
+  # Match the groups in group info to expression data samples
+  data.cl <- rep(0, ncol(variables$CountData))
+  for (i in seq_along(variables$groupList)) {
+    indices <- match(variables$groupList[[i]], colnames(variables$CountData))
+    data.cl[indices] <- names(variables$groupList)[i]
   }
   
-  tryCatch(
-    {
-      progressSweetAlert(
-        session = session,
-        id = "dataImportProgress",
-        title = "Processing group info",
-        display_pct = TRUE,
-        value = 0
-      )
-      showNotification("Uploading file...", type = "message")
-      
-      
-      group <- data.frame(fread(input$uploadGroup$datapath, header = T, blank.lines.skip = T))
-      group_no_header <- data.frame(fread(input$uploadGroup$datapath,header = FALSE))
-      
-      showNotification("Data uploaded successfully.", type = "message")
-      
-      #store group information
-      colnames(group)[1] <- "sample"
-      variables$group <- group
-      
-      
-      # variables$group_no_header <- group_no_header
-      group_no_header <- group_no_header[-1,]
-      groupName <- colnames(group)
-      
-      
-      # Create groupList
-      variables$groupList <- split(group_no_header$V1, group_no_header$V2)
-      
-      # Match the groups in group info to expression data samples
-      data.cl <- rep(0, ncol(variables$CountData))
-      for (i in seq_along(variables$groupList)) {
-        indices <- match(variables$groupList[[i]], colnames(variables$CountData))
-        data.cl[indices] <- names(variables$groupList)[i]
-      }
-      
+  
+  
+  # Storage convert group list to local
+  variables$groupListConvert <- data.cl
+  
+  #store numeric data
+  variables$count.data <- as.matrix(variables$CountData[, data.cl != 0])
+  
 
-      
-      # Storage convert group list to local
-      variables$groupListConvert <- data.cl
-      
-      #store numeric data
-      variables$count.data <- as.matrix(variables$CountData[, data.cl != 0])
-      
-      # Check if sample info matches raw data
-      if (ncol(variables$count.data) != nrow(group)) {
-        sendSweetAlert(
-          session = session,
-          title = "Warning",
-          text = "Sample number should match group info.",
-          type = "warning"
-        )
-        return()
-      }
-      
-      # Store converted group info
-      group2 <- data.frame(group = factor(data.cl[data.cl != 0]))
-      rownames(group2) <- colnames(variables$count.data)
-      variables$group_import <- group2
-      
-      updateProgressBar(
-        session = session,
-        id = "dataImportProgress",
-        title = "Summarizing data",
-        value = 90
-      )
-      
-      output$groupSelection = renderUI({
-        
-        meatData1 <- reactive(variables$group)
-        df = metaData1()
-        if (is.null(colnames(df))) {
-          vars = NULL
-        } else {
-          vars = colnames(df)[2: ncol(df)]    
-        }
+  
+  # Store converted group info
+  group2 <- data.frame(group = factor(data.cl[data.cl != 0]))
+  rownames(group2) <- colnames(variables$count.data)
+  variables$group_import <- group2
+  
 
-        selectInput("groups1", "Grouping variable",
-                    choices = vars, selected = vars[1])
-      })
-      
-      closeSweetAlert(session = session)
-      sendSweetAlert(
-        session = session,
-        title = "DONE",
-        text = "Group labels were successfully assigned.",
-        type = "success"
-      )
-      
-      dataImportCheck$importRunValue <- input$confirmedGroupList
-      
-    },
-    error = function(e) {
-      sendSweetAlert(
-        session = session,
-        title = "ERROR",
-        text = "Check your group information format!",
-        type = "error"
-      )
-      return()
-    },
-    warning = function(w) {
-      sendSweetAlert(
-        session = session,
-        title = "Group Error!",
-        text = "Check your group information format!",
-        type = "error"
-      )
-      return()
+  
+  output$groupSelection = renderUI({
+    
+    
+    df = variables$group
+    if (is.null(colnames(df))) {
+      vars = NULL
+    } else {
+      vars = colnames(df)[2: ncol(df)]    
     }
-  )
+    print(vars)
+    selectInput("groups1", "Grouping variable",
+                choices = vars, selected = vars[1])
+    
+  })
+  
+ 
+  dataImportCheck$importRunValue <- TRUE
 })
 
 
@@ -342,66 +290,66 @@ observeEvent(input$groups1,{
   group2 <- data.frame(group = factor(data.cl[data.cl != 0]))
   rownames(group2) <- colnames(variables$count.data)
   variables$group_import <- group2
-
-})
-
-output$importDataSummary <- renderUI({
-  dt <- datasetInput()
-  dup <- variables$dup
   
-  rowCount <- nrow(dt)
-  groupCount <- length(variables$groupList)
-  groupText <- sapply(variables$groupList, length)
-  if (length(groupText) > 0) {
-    gText <- paste0(names(groupText), ": ", groupText, collapse = "<br>")
-  } else {
-    gText <- NULL
-  }
-  variables$groupText <- gText
-  
-  data <- variables$CountData
-  data.cl <- variables$groupListConvert
-  cName <- unlist(variables$groupList)
-  nNA <- variables$nNA
-  
-  tagList(
-    tipify(
-      tags$p(tags$b("N", tags$sub("Protein/Peptide")), ":", rowCount),
-      title = "Number of proteins/peptides",
-      placement = "left"
-    ),
-    tipify(
-      tags$p(tags$b("N", tags$sub("group")),": ", groupCount),
-      title = "Number of groups",
-      placement = "left",
-    ),
-    tipify(
-      tags$p(tags$b("N", tags$sub("samples in group")), HTML(": <br>"), HTML(gText)),
-      title = "Number of samples in each group",
-      placement = "left"
-    ),
-    tipify(
-      tags$p(tags$b("N", tags$sub("replicates")), ": ", dup),
-      title = "Number of replicated gene names",
-      placement = "left"
-    ),
-    tipify(
-      tags$p(tags$b("Nrow",tags$sub("NA")), ": ", nNA),
-      title = "Rows of proteins/petides that contain at least 1 NA",
-      placement = "left"
+  output$importDataSummary <- renderUI({
+    dt <- variables$CountData
+    dup <- variables$dup
+    
+    rowCount <- nrow(dt)
+    groupCount <- length(variables$groupList)
+    groupText <- sapply(variables$groupList, length)
+    if (length(groupText) > 0) {
+      gText <- paste0(names(groupText), ": ", groupText, collapse = "<br>")
+    } else {
+      gText <- NULL
+    }
+    variables$groupText <- gText
+    data <- variables$CountData
+    data.cl <- variables$groupListConvert
+    cName <- unlist(variables$groupList)
+    nNA <- variables$nNA
+    tagList(
+      tipify(
+        tags$p(tags$b("N", tags$sub("Protein/Peptide")), ":", rowCount),
+        title = "Number of proteins/peptides",
+        placement = "left"
+      ),
+      tipify(
+        tags$p(tags$b("N", tags$sub("group")),": ", groupCount),
+        title = "Number of groups",
+        placement = "left",
+      ),
+      tipify(
+        tags$p(tags$b("N", tags$sub("samples in group")), HTML(": <br>"), HTML(gText)),
+        title = "Number of samples in each group",
+        placement = "left"
+      ),
+      tipify(
+        tags$p(tags$b("N", tags$sub("replicates")), ": ", dup),
+        title = "Number of replicated gene names",
+        placement = "left"
+      ),
+      tipify(
+        tags$p(tags$b("Nrow",tags$sub("NA")), ": ", nNA),
+        title = "Rows of proteins/petides that contain at least 1 NA",
+        placement = "left"
+      )
     )
-  )
+  })
+  
+  
 })
 
-v <- reactiveValues(importActionValue = FALSE)
 
+
+# This function render a boxplot of sample distribution ----
 # This function render a boxplot of sample distribution ----
 
 output$sampleDistributionBox <- renderPlotly({
   if (length(variables$count.data) > 0) {
-
+    
     data <- variables$count.data
-  
+    
     
     log2data <- as.data.frame(log2(data))
     
@@ -450,14 +398,14 @@ output$sampleDistributionBox <- renderPlotly({
 # Render a density plot of sample distribution ----
 output$sampleDistributionDensity <- renderPlotly({
   if (length(variables$count.data) > 0) {
-
+    
     dt <- as.data.frame(variables$count.data)
-
+    
     count <- dt
     data <- log2(count)
     
     group <- variables$group_import
-
+    
     densityTable <- apply(data, 2, function(x) {
       density(na.omit(x))
     })
@@ -497,7 +445,7 @@ output$sampleDistributionDensityPanel <- renderUI({
     tagList(fluidRow(
       column(
         3,
-
+        
         textInput(
           inputId = "sampleDistributionDenstityTitle",
           label = "Title",
@@ -572,7 +520,7 @@ output$sampleDistributionBoxPanel <- renderUI({
 # Filtering low count under different low number, barplot ----
 output$lowCountFilterByCutoff <- renderPlotly({
   if (length(variables$count.data) > 0) {
-
+    
     data <- variables$count.data
     originalCount <- nrow(data)
     
@@ -778,7 +726,7 @@ output$pcaPlotObject3d <- renderPlotly({
                yaxis = list(title = (paste0("PC2(",round(importance[2,2]*100,digits = 2),"%)"))),
                zaxis = list(title = (paste0("PC3(",round(importance[3,2]*100,digits = 2),"%)")))
              )
-             ) %>%
+      ) %>%
       plotly::config(
         toImageButtonOptions = list(
           format = "svg",
@@ -806,7 +754,7 @@ output$pcaPlotObject2d <- renderPlotly({
     }
     
     data <- data[,colSums(is.na(data))<nrow(data)]
-   #perform PCA
+    #perform PCA
     data.pca.all <- prcomp(data,
                            center = input$pcaCenter,
                            scale. = input$pcaScale
@@ -847,7 +795,7 @@ output$pcaPlotObject2d <- renderPlotly({
           filename = "PCA_Plot2D"
         )
       )
-
+    
     variables$pca2d <- p
     p
   } else {
@@ -874,21 +822,21 @@ output$pcaSummaryObject <- DT::renderDataTable({
                            scale. = input$pcaScale
     )
     
-
+    
     
     summaryTable <- summary(data.pca.all)$importance
     row.names(summaryTable)[1] <- "Standard Deviation"
     summaryTable <- t(summaryTable)
     displayTable <- DT::datatable(summaryTable,
-                       option = list(
-                         rowReorder = TRUE,
-                         deferRender = TRUE,
-                         autoWidth = TRUE,
-                         pageLength = 20,
-                         searchHighlight = TRUE,
-                         orderClasses = TRUE
-                       )
-                       ) %>%
+                                  option = list(
+                                    rowReorder = TRUE,
+                                    deferRender = TRUE,
+                                    autoWidth = TRUE,
+                                    pageLength = 20,
+                                    searchHighlight = TRUE,
+                                    orderClasses = TRUE
+                                  )
+    ) %>%
       formatRound(
         columns = colnames(summaryTable),
         digits = 3
@@ -1016,7 +964,7 @@ output$pcaUI <- renderUI({
             title = "Scree Plot",
             plotlyOutput("pcaPlotObjectScree") %>% withSpinner()
           )
-
+          
         )
       )
     ))
@@ -1122,3 +1070,4 @@ output$dendUI <- renderUI({
     helpText("No data for ploting. Please import dataset and assign group information first.")
   }
 })
+

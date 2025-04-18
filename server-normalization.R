@@ -68,8 +68,8 @@ normRun <- reactiveValues(normRunValue = FALSE)
 #v$importActionValue <- F
 
 output$batchSelect <- renderUI({
-  meatData1 <- reactive(variables$group)
-  df = metaData1()
+  metaData1 <- variables$group
+  df = metaData1
   if (is.null(colnames(df))) {
     vars = NULL
   } else {
@@ -83,8 +83,8 @@ output$batchSelect <- renderUI({
 })
 
 output$internalReference <- renderUI({
-  meatData1 <- reactive(variables$group)
-  df = metaData1()
+  metaData1<- variables$group
+  df = metaData1
   if (is.null(colnames(df))) {
     vars = NULL
   } else {
@@ -103,24 +103,10 @@ output$internalReference <- renderUI({
 
 #if the batchlist is uploaded
 observeEvent(input$confirmedBatchList, {
-  progressSweetAlert(
-    session = session,
-    id = "batchNormProgress",
-    title = "Read in raw data",
-    display_pct = TRUE,
-    value = 0
-  )
   
   rawdata <- variables$CountData
-  #write.csv(rawdata, "test/Rawdata.csv")
   
   
-  updateProgressBar(
-    session = session,
-    id = "batchNormProgress",
-    title = "Batch Effect Elimination",
-    value = 10
-  )
   
   #run batch effect elimination
   tb = rawdata
@@ -129,15 +115,8 @@ observeEvent(input$confirmedBatchList, {
   smallValue = 1
   tb = log2(tb + smallValue)
   
-  #write.csv(tb, "test/tb_transformed.csv")
   
   
-  updateProgressBar(
-    session = session,
-    id = "batchNormProgress",
-    title = "Get Batch list",
-    value = 20
-  )
   
   
   #input the batch group list from user
@@ -151,71 +130,39 @@ observeEvent(input$confirmedBatchList, {
   }
   
   #get the new group
-  variables$batchGroupList <-
-    lapply(unique(groupList[, idx]), function(x) {
-      groupList[which(groupList[, idx] == x), ]$sample
-    })
-  names(variables$batchGroupList) <- unique(groupList[, idx])
+  variables$batchGroupList <-split(groupList$sample, groupList[, idx])
+  #names(variables$batchGroupList) <- unique(groupList[, idx])
   
   #get the batch group
   batchgroup <- groupList[, c(1, idx)]
   colnames(batchgroup) <- c("sample", "batch")
   
   
-  updateProgressBar(
-    session = session,
-    id = "batchNormProgress",
-    title = "Calculating normalization factors",
-    value = 40
-  )
-
   
   batch_vector = as.data.frame(batchgroup$batch)
   bch = as.vector(batch_vector[, 1])
+
   
-  #write.table(batchgroup, "test/batchgroup.txt")
   
   # Normalize data based on selection
-  updateProgressBar(
-    session = session,
-    id = "batchNormProgress",
-    title = "Performing Normalization",
-    value = 60
-  )
   
   #get the internal information
   if (input$normalization == 'internalNM' || input$normalization=='internal_linearNM') {
     idx <- as.numeric(grep(input$intRefCol, colnames(groupList)))
     interRef <- groupList[, idx]
-    tryCatch({
-      trans = as.data.frame(cbind(batchgroup$batch, batchgroup$sample, interRef))
-      standard_vector = trans[trans$interRef == "internal", ]
-      standard_vector$interRef[1] = "standard"
-      standard_vector$interRef[2:nrow(standard_vector)] <- "non_standard"
-      #write.table(standard_vector, "test/standard_vec.txt")
-      
-      norm = normalizeBatchesByInternalStandard(tb, bch, standard_vector)
-      if(input$normalization == 'internal_linearNM'){
-        norm = removeBatchEffect(norm, bch)
-      }
-    }, error = function(e) {
-      sendSweetAlert(
-        session = session,
-        title = "Batch assigned failed.",
-        text = as.character(message(e)),
-        type = "error"
-      )
-      return()
-    }, warning = function(w) {
-      sendSweetAlert(
-        session = session,
-        title = "Batch information incorrect",
-        text = "Some error is in the batch info.",
-        type = "warning"
-      )
-      return()
-    })
+    trans = as.data.frame(cbind(batchgroup$batch, batchgroup$sample, interRef))
+    standard_vector = trans[trans$interRef == "internal", ]
+    standard_vector$interRef[1] = "standard"
+    standard_vector$interRef[2:nrow(standard_vector)] <- "non_standard"
+
     
+
+    
+    norm = normalizeBatchesByInternalStandard(tb, bch, standard_vector)
+    if(input$normalization == 'internal_linearNM'){
+      norm = removeBatchEffect(norm, bch)
+    }
+
     
   } else{
     if (input$normalization == 'linearNM') {
@@ -225,21 +172,15 @@ observeEvent(input$confirmedBatchList, {
   
   norm <- 2 ^ norm
   
-  updateProgressBar(
-    session = session,
-    id = "batchNormProgress",
-    title = "Saving normalized data",
-    value = 80
-  )
   #save the normalized data
   variables$normedData <- cbind(variables$CountData[, c(1, 2)], norm)
-  #write.csv(norm, "test/norm.csv")
   
   data.cl <- rep(0, ncol(variables$normedData))
   for (i in seq_along(variables$batchGroupList)) {
     indices <- match(variables$batchGroupList[[i]], colnames(variables$normedData))
     data.cl[indices] <- names(variables$batchGroupList)[i]
   }
+  
   # for (i in 1:length(variables$batchGroupList)) {
   #   data.cl[unlist(lapply(variables$batchGroupList[[i]], convert2cl, df = variables$normedData))] <- names(variables$batchGroupList[i])
   # }
@@ -259,15 +200,8 @@ observeEvent(input$confirmedBatchList, {
   variables$normed_group_import <- group2
   
   
-  normRun$normRunValue <- input$confirmedBatchList
+  normRun$normRunValue <- TRUE
   
-  
-  updateProgressBar(
-    session = session,
-    id = "batchNormProgress",
-    title = "Form Data Table",
-    value = 90
-  )
   
   tbtoshow <- round(norm, digits = 2)
   tbtoshow <- cbind(variables$CountData[, c(1, 2)], tbtoshow)
@@ -294,50 +228,25 @@ observeEvent(input$confirmedBatchList, {
         orderClasses = TRUE
       )
     )
-  }, server = FALSE)
+  }, server = T)
   
   
-  updateProgressBar(
-    session = session,
-    id = "batchNormProgress",
-    title = "Export Data Table",
-    value = 100
-  )
   
-  closeSweetAlert(session = session)
-  sendSweetAlert(
-    session = session,
-    title = "DONE",
-    text = "Normalization was successfully performed.",
-    type = "success"
-  )
   
 })
 
 # Render DataTable of row data proteins ----
 output$normalizationResultTable <- renderUI({
-  if (!normRun$normRunValue) {
-    tags$p(
-      "No data to show. Click",
-      tags$code("Run Batch Normalization"),
-      "to remove batch effect or ",
-      tags$code("Upload"),
-      "your own dataset in exploratory analysis first."
-    )
-  } else {
-    tagList(fluidRow(
-      column(
-        12,
-        downloadButton("downloadnorm", "Download Normalized Table"),
-        DT::dataTableOutput("normTable") %>% withSpinner()
-      )
-    ))
-  }
+  if(normRun$normRunValue){
+    tagList(
+      fluidRow(column(
+        12, 
+        downloadButton("downloadnorm", "Download Result Table"),
+        DT::dataTableOutput('normTable') %>% withSpinner()
+      )))} else {
+        helpText("Click [Run Normalization] to obtain Result Table.")
+      }
 })
-
-
-
-# Output different plots on bottom right
 
 # This function render a boxplot of sample distribution ----
 output$normed_sampleDistributionBox <- renderPlotly({
@@ -392,17 +301,53 @@ output$normed_sampleDistributionBox <- renderPlotly({
   }
 })
 
+# Sample Distribution Boxplot UI ----
+output$norm_DistributionBoxPanel <- renderUI({
+  if (normRun$normRunValue) {
+    tagList(fluidRow(
+      column(
+        3,
+        sliderInput(
+          inputId = "normed_sampleDistributionFilterLow",
+          label = "Filter low proteins",
+          min = 0,
+          max = 30,
+          value = 0
+        ),
+        textInput(
+          inputId = "norm_sampleDistributionTitle",
+          label = "Title",
+          value = "Original Raw Intensity",
+          placeholder = "Original Raw Intensity"
+        ),
+        textInput(
+          inputId = "norm_sampleDistributionXlab",
+          label = "X label",
+          value = "Sample",
+          placeholder = "Sample"
+        ),
+        textInput(
+          inputId = "norm_sampleDistributionYlab",
+          label = "Y label",
+          value = "log<sub>2</sub>(Intensity + 1)",
+          placeholder = "log<sub>2</sub>(Intensity + 1)"
+        )
+      ),
+      column(
+        9,
+        plotlyOutput("normed_sampleDistributionBox") %>% withSpinner()
+      )
+    ))
+  } else {
+    helpText("No data for ploting. Please import dataset and assign group information first.")
+  }
+})
+
 # Render a density plot of sample distribution ----
 output$normed_sampleDistributionDensity <- renderPlotly({
   if (length(variables$normed.count.data) > 0) {
     normed_data <- variables$normed.count.data
-    if (input$norm_densityFilter != "Do not filter") {
-      count <-
-        normed_data[rowSums(normed_data) > as.numeric(input$norm_densityFilter), ]
-    } else {
-      count <- normed_data
-    }
-    data <- log2(count + 1)
+    data <- log2(normed_data + 1)
     
     group <- variables$normed_group_import
     densityTable <- apply(data, 2, function(x) {
@@ -444,19 +389,6 @@ output$norm_sampleDistributionDensityPanel <- renderUI({
     tagList(fluidRow(
       column(
         3,
-        popify(
-          helpText(
-            "Filter proteins with a total read count smaller than thresholds."
-          ),
-          title = "Reference",
-          content = 'Sultan, Marc, et al. <a href="http://science.sciencemag.org/content/321/5891/956">"A global view of protein activity and alternative splicing by deep sequencing of the human transcriptome."</a> <i>Science</i> 321.5891 (2008): 956-960.',
-          placement = "left"
-        ),
-        sliderTextInput(
-          inputId = "norm_densityFilter",
-          label = "Filter proteins threshold",
-          choices = c("Do not filter", c(0:30))
-        ),
         textInput(
           inputId = "norm_sampleDistributionDenstityTitle",
           label = "Title",
@@ -487,145 +419,12 @@ output$norm_sampleDistributionDensityPanel <- renderUI({
 })
 
 
-# Sample Distribution Boxplot UI ----
-output$norm_DistributionBoxPanel <- renderUI({
-  if (normRun$normRunValue) {
-    tagList(fluidRow(
-      column(
-        3,
-        sliderInput(
-          inputId = "normed_sampleDistributionFilterLow",
-          label = "Filter low proteins",
-          min = 0,
-          max = 30,
-          value = 0
-        ),
-        textInput(
-          inputId = "sampleDistributionTitle",
-          label = "Title",
-          value = "Original Raw Intensity",
-          placeholder = "Original Raw Intensity"
-        ),
-        textInput(
-          inputId = "sampleDistributionXlab",
-          label = "X label",
-          value = "Sample",
-          placeholder = "Sample"
-        ),
-        textInput(
-          inputId = "sampleDistributionYlab",
-          label = "Y label",
-          value = "log<sub>2</sub>(Intensity + 1)",
-          placeholder = "log<sub>2</sub>(Intensity + 1)"
-        )
-      ),
-      column(
-        9,
-        plotlyOutput("normed_sampleDistributionBox") %>% withSpinner()
-      )
-    ))
-  } else {
-    helpText("No data for ploting. Please import dataset and assign group information first.")
-  }
-})
-
-
-# Filtering low count under different low number, barplot ----
-output$norm_lowCountFilterByCutoff <- renderPlotly({
-  if (length(variables$normed.count.data) > 0) {
-    normed_data <- variables$normed.count.data
-    originalCount <- nrow(normed_data)
-    
-    lowCount <-
-      sapply(0:input$lowCountSlide, function(x) {
-        sum(rowSums(normed_data) > x)
-      })
-    
-    lowCountdt <- data.frame(
-      "Cutoff" = 0:input$lowCountSlide,
-      "Filtered" = originalCount - lowCount,
-      "Remain" = lowCount
-    )
-    
-    plot_ly(
-      lowCountdt,
-      name = "Remain",
-      x = ~ Cutoff,
-      y = ~ Remain,
-      text = ~ Remain,
-      textposition = "outside",
-      hoverinfo = "text+name",
-      hovertext = ~ paste0(
-        "Cut off: ",
-        Cutoff,
-        "<br>Filtered number: ",
-        Filtered,
-        "<br>Remain number: ",
-        Remain,
-        "(",
-        round(Remain / nrow(data) * 100, 2),
-        "%)"
-      ),
-      type = "bar"
-    ) %>%
-      add_trace(
-        name = "Filtered",
-        y = ~ Filtered,
-        text = ~ Filtered,
-        type = "bar",
-        textposition = "inside"
-      ) %>%
-      layout(
-        title = "Filtering Threshold for Low Intensity",
-        barmode = "stack",
-        xaxis = list(title = "Filtering Low Intensity Cut off"),
-        yaxis = list(title = "Protein number")
-      ) %>%
-      config(
-        toImageButtonOptions = list(format = "svg", filename = "Filtering_Threshold_for_Low_Count_Proteins")
-      )
-  } else {
-    return()
-  }
-})
-
-# Render Filtering Cutoff UI ----
-output$norm_lowCountFilterByCutoffUI <- renderUI({
-  if (normRun$normRunValue) {
-    tagList(fluidRow(
-      column(
-        3,
-        popify(
-          helpText(
-            "Filter proteins with tota intensity smaller than thresholds."
-          ),
-          placement = "left"
-        ),
-        sliderInput(
-          inputId = "lowCountSlide",
-          label = "Max threshold",
-          min = 1,
-          max = 35,
-          value = 20,
-          step = 1
-        )
-      ),
-      column(
-        9,
-        plotlyOutput("norm_lowCountFilterByCutoff") %>% withSpinner()
-      )
-    ))
-  } else {
-    helpText("No data for ploting. Please import dataset and assign group information first.")
-  }
-})
-
 # PCA Plot Scree ----
 output$normed_pcaPlotObjectScree <- renderPlotly({
   if (length(variables$normed.count.data) > 0) {
     normed_data <- variables$normed.count.data
     if (input$normed_pcaTransform == TRUE) {
-      normed_data <- log1p(normed_data)
+      normed_data <- log2(normed_data)
     } else {
       normed_data <- normed_data
     }
@@ -682,7 +481,7 @@ output$normed_pcaPlotObject3d <- renderPlotly({
   if (length(variables$normed.count.data) > 0) {
     data <- variables$normed.count.data
     if (input$normed_pcaTransform == TRUE) {
-      data <- log1p(data)
+      data <- log2(data)
     } else {
       data <- data
     }
@@ -744,7 +543,7 @@ output$normed_pcaPlotObject2d <- renderPlotly({
   if (length(variables$normed.count.data) > 0) {
     data <- variables$normed.count.data
     if (input$normed_pcaTransform == TRUE) {
-      data <- log1p(data)
+      data <- log2(data)
     } else {
       data <- data
     }
@@ -804,7 +603,7 @@ output$normed_pcaSummaryObject <- DT::renderDataTable({
   if (length(variables$normed.count.data) > 0) {
     data <- variables$normed.count.data
     if (input$normed_pcaTransform == TRUE) {
-      data <- log1p(data)
+      data <- log2(data)
     } else {
       data <- data
     }
@@ -861,7 +660,7 @@ output$normed_pcaSummaryObject <- DT::renderDataTable({
 
 # render PCA UI ----
 output$normed_pcaTopproteinPreview <- renderUI({
-  dt <- variables$count.data
+  dt <- variables$normed.count.data
   selected <- input$normed_pcaTopprotein
   dim <- nrow(dt)
   percent <- selected / dim * 100
@@ -963,6 +762,7 @@ output$norm_pcaUI <- renderUI({
   }
 })
 
+
 # sample-sample correlation heatmap ----
 output$normed_dendPlotObject <- renderPlotly({
   if (length(variables$normed.count.data) > 0) {
@@ -996,7 +796,7 @@ output$normed_dendPlotObject <- renderPlotly({
 
 # Render dend and heatmap UI ----
 output$normed_dendtopProteinPreview <- renderUI({
-  dt <- variables$count.data
+  dt <- variables$normed.count.data
   selected <- input$normed_dendTopGene
   dim <- nrow(dt)
   percent <- selected / dim * 100
@@ -1053,3 +853,4 @@ output$norm_dendUI <- renderUI({
     helpText("No data for ploting. Please import dataset and assign group information first.")
   }
 })
+

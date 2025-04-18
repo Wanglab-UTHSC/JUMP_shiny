@@ -28,14 +28,14 @@ fluidPage(
           ),
           selected = "NA"
         ),
-        conditionalPanel(
-          condition = "input.ImputationSelection == 'Imputation'",
-          numericInput(
-            inputId = "filterValue",
-            label = "Enter Filter Value",
-            value = 1
-          )
-        ),
+        #conditionalPanel(
+         # condition = "input.ImputationSelection == 'Imputation'",
+          #numericInput(
+           # inputId = "filterValue",
+            #label = "Enter Filter Value",
+            #value = 1
+          #)
+       # ),
         # Popovers for each radio button choice
         radioTooltip("ImputationSelection", choice = "NA", title = "No imputation on whole data"),
         radioTooltip("ImputationSelection", choice = "Imputation", title = "See documentation for details"),
