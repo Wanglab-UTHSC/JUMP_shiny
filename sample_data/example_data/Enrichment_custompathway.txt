@@ -1,0 +1,7 @@
+Pathway,Description,Gene
+Apoptosis,Programmed cell death,TP53
+Apoptosis,Programmed cell death,BAX
+Apoptosis,Programmed cell death,CASP3
+MAPK_signaling,MAPK cascade,MAPK1
+MAPK_signaling,MAPK cascade,MAPK3
+MAPK_signaling,MAPK cascade,JUN
