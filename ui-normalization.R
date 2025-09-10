@@ -16,7 +16,8 @@ fluidPage(
             label = "Normalization Method",
             #select between two normalization methods
             choices = c("Internal" = "internalNM",
-                        "Linear" = "linearNM")
+                        "Linear" = "linearNM",
+                        "Internal+Linear" = "internal_linearNM")
             
           )
         )
@@ -28,35 +29,8 @@ fluidPage(
         solidHeader = T,
         status = "primary",
         width = NULL,
-        textAreaInput(
-          "batchSelectViaText",
-          "Input your different batch info",
-          rows = 6,
-          placeholder = paste0(
-            "Please input batch information at here. ",
-            "--Linear Example--",
-            "Sample,Batch\n",
-            "sig126,Batch1",
-            "sig127N,Batch1",
-            "sig127C,Batch1",
-            "sig128N,Batch1",
-            "sig128C,Batch2",
-            "sig129N,Batch2",
-            "sig129C,Batch2",
-            "sig130N,Batch2",
-            "--Internal Example--",
-            "Sample,Batch,Info",
-            "sig126,Batch1,internal",
-            "sig127N,Batch1",
-            "sig127C,Batch1",
-            "sig128N,Batch1",
-            "sig128C,Batch2,internal",
-            "sig129N,Batch2",
-            "sig129C,Batch2",
-            "sig130N,Batch2"
-            # sep = "\n"
-          )
-        ),
+        uiOutput("batchSelect"),
+        uiOutput("internalReference"),
         do.call(actionBttn, c(
           list(
             inputId = "confirmedBatchList",
@@ -65,13 +39,13 @@ fluidPage(
           actionBttnParams
         )
         ),
-        footer = helpText("JUMP expect first column to be Sample and the second one be Batch.")
+        footer = helpText("Internal reference column should specify reference sample as 'internal'.")
       )
     ),
     column(9,
            box(
              #show the data table after normalization
-             title = tagList(icon("table"), "Data Table"),
+             title = tagList(icon("table"), "Protein expression table"),
              width = NULL,
              solidHeader = TRUE,
              status = "primary",
@@ -90,7 +64,7 @@ fluidPage(
              ),
              tabPanel(title = tagList(icon("object-group"), "PCA"),
                       uiOutput("norm_pcaUI")),
-             tabPanel(title = tagList(icon("sitemap"), "Hierarchical Clustering"),
+             tabPanel(title = tagList(icon("sitemap"), "Sample Correlation"),
                       uiOutput("norm_dendUI"))
            ))
   )

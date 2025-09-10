@@ -1,6 +1,9 @@
+#Acknowledgement: 
+#Some code of this program was adapted from a program related under the MIT license:
+#TCC-GUI(https://github.com/swsoyee/TCC-GUI)
+
 library(shiny)
 
-options(shiny.maxRequestSize = 60*1024^2)
 
 source(file = "global.R",
        local = TRUE,
@@ -8,31 +11,6 @@ source(file = "global.R",
 
 # Define server
 shinyServer(function(input, output, session) {
-  
-  # the modal dialog where the user can enter the query details.
-  updates_modal <- modalDialog(
-    title = tags$h1("240702 Updates",style="text-align:center"),
-    tags$div(
-      tags$h3("New Feature"),
-      tags$ul(
-        tags$li("Differential Expression Analysis: Now missing value imputation is available for pairwise comparison"),
-        #tags$li("Heatmap under DE: Allow user to choose clustering dendrogram on rows/columns"),
-        #tags$li("Covariates analysis could now work properly")
-      ),
-      tags$hr(),
-      tags$h3("Fixes"),
-      tags$ul(
-        tags$li("Sample distribution boxplot filter fixed")
-        #tags$li("PCA 2D plot label fixed"),
-        #tags$li("Moving SD calculation approach fixed")
-      ),
-    ),
-    easyClose = T
-  )
-  
-  # Show the model on start up ...
-  showModal(updates_modal)
-  
   
   #store global variables
   variables = reactiveValues(
@@ -52,10 +30,7 @@ shinyServer(function(input, output, session) {
     #differentiation result
     result = data.frame("Results will show here." = character(0)),
     res = data.frame(),
-    zeroValue = "",
     norData = "",
-    runTCCCode = "",
-    runMAPlot = "",
     runVolcanoPlot = "",
     runHeatmap = "",
     runPCACode = "",
@@ -65,16 +40,11 @@ shinyServer(function(input, output, session) {
     normed_sampleDistributionBar = "",
     norSampleDistributionBar = "",
     norSampleDistributionDensity = "",
-    MAPlotObject = "",
     VolcanoPlotObject = "",
     
     normedData = data.frame(),
     
-    mdsPlot = list(),
-    mdsPlotplot = NULL,
-    
     data.pca = NULL,
-    pcaParameter = NULL,
     normed_pcaParameter = NULL,
     screePlot = NULL,
     normedScreePlot = NULL,
@@ -103,13 +73,6 @@ shinyServer(function(input, output, session) {
     
     #covariance
     corrected_data = data.frame(),
-    
-    logList = data.frame(
-      "Time" = vector(),
-      "Type" = vector(),
-      "Action" = vector(),
-      "Parameters" = vector()
-    ),
     reportFile = NULL
   )
   source(file = "server-blockRand.R",
@@ -128,16 +91,8 @@ shinyServer(function(input, output, session) {
   source(file = "server-enrichment.R",
          local = TRUE,
          encoding = "UTF-8")
-  source(file = "server-jumpn.R",
-         local = TRUE,
-         encoding = "UTF-8")
+
   source(file = "server-covariance.R",
-         local = TRUE,
-         encoding = "UTF-8")
-  # source(file = "server-KSEM.R",
-  #        local = TRUE,
-  #        encoding = "UTF-8")
-  source(file = "server-report.R",
          local = TRUE,
          encoding = "UTF-8")
   

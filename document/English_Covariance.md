@@ -1,21 +1,25 @@
-# Steps for Covariates Correction
+# Covariates Correction
+
+Covariate correction is to adjust for potential confounding variables that may influence the results, especially for human samples. By accounting for these covariates, you can ensure that the observed effects are primarily due to the variables of interest rather than external factors. 
 
 ---
 
-1. **Input Covariates Group Information**
+1. **Selecting Covariates Group Information**
 
-   Input your covariates group information in the text area, then click `Assign Covariates`.
-   Ensure to include the header.
+   To perform covariate correction, select the covariates column(s) from your dataset that you want to adjust. You can select multiple co-variate factors. The selected parameters will be used in the correction process.
 
-   ![Covariates Group Input](../www/images/cov.png){width=90%}
+   ![Covariates Group Input](../www/images/cov.png){width=30%}
+   
+  By clicking the `[Run Correction]` button, the corrected result table will appear on the right side of the page.  
+  JUMP shiny uses a simple regression model to remove the covariate factors and output the residuals. The correction is performed for each protein. 
 
-2. **Select Parameters for Correction**
+   
 
-   Click the parameters that you want to include in the correction. All the selected parameters are used in the correction.
-   Click the `Run Correction` button, and the corrected result table will appear on the right.
 
-   ![Covariates Group](../www/images/cov_group.png){width=30%}
+2. **Density Plot**
 
-3. **Density Plot**
+   After the analysis, density plots were generated for each co-variate, showing the p-value of correlations before and after correction.
 
-   A density plot showing the p-value of correlation before and after correction will be displayed.
+  ![Covariates result](../www/images/cov_result.png){width=90%}
+  ![Covariates density](../www/images/density_plot.png){width=90%}
+  

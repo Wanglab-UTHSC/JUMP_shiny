@@ -9,7 +9,6 @@ library(RColorBrewer)
 library(DT)
 library(curl)
 library(pheatmap)
-library(gridlayout)
 library(zoo)
 library(shinyBS)
 
@@ -26,7 +25,9 @@ source(file = "preprocess.R",
 
 DERun <- reactiveValues(DERunValue = FALSE)
 volrun <- reactiveValues(volrunval = FALSE)
-HeatmapRun <- reactiveValues(heatmapRunValue = FALSE, height = 300)
+HeatmapRun <- reactiveValues(heatmapRunValue = FALSE)
+
+
 
 #load group selection
 metaData1 <- reactive(variables$group)
@@ -68,30 +69,19 @@ output$group3 <- renderUI({
   ngroup <- length(vars)
   
   if(input$compareSelection == "pair"){
-
-      output[[1]] = selectInput(
-        inputId = "group1select",
-        label = "Select first group for comparison",
-        choices = vars,
-        selected = vars[1]
-      )
-      output[[2]] = selectInput(
-        inputId = "group2select",
-        label = "Select second group for comparison",
-        choices = vars,
-        selected = vars[2]
-      )
-      output[[3]]=tagList(radioButtons(
-        inputId = "ImputationSelection",
-        label = "Missing Value Imputation",
-        choices = c("No Imputation" = "NA","Imputation" = "Imputation","Data without NAs"="CleanData"),
-        selected = "NA"
-      ),
-      # Popovers for each radio button choice
-     radioTooltip("ImputationSelection",choice = "NA",title = "No imputation on whole data"),
-     radioTooltip("ImputationSelection",choice = "Imputation",title = "See documentation for details"),
-     radioTooltip("ImputationSelection",choice = "CleanData",title = "No imputation and perform DE only on data without NAs")
-      )
+    
+    output[[1]] = selectInput(
+      inputId = "group1select",
+      label = "Select first group for comparison",
+      choices = vars,
+      selected = vars[1]
+    )
+    output[[2]] = selectInput(
+      inputId = "group2select",
+      label = "Select second group for comparison",
+      choices = vars,
+      selected = vars[2]
+    )
   }else{
     validate(
       need(ngroup !=2, "There are only two groups. More than three groups is required.")
@@ -112,14 +102,15 @@ output$group3 <- renderUI({
 
 #if submission button is clicked
 observeEvent(input$DETestType,{
-  progressSweetAlert(
-    session = session,
-    id = "DEProgress",
-    title = "Read in data",
-    display_pct = TRUE,
-    value = 0
-  )
-  
+  DERun$DERunValue = FALSE
+  # progressSweetAlert(
+  #   session = session,
+  #   id = "DEProgress",
+  #   title = "Read in data",
+  #   display_pct = TRUE,
+  #   value = 0
+  # )
+  # 
   #based on inport load normalized data or original data if normalization not required
   if(is.data.frame(variables$corrected_data) &&nrow(variables$corrected_data)!=0){
     data <- variables$corrected_data
@@ -128,15 +119,15 @@ observeEvent(input$DETestType,{
   else{
     data <- variables$CountData
   }
-  
-  
-  updateProgressBar(
-    session = session,
-    id = "DEProgress",
-    title = "Load Normalized Data",
-    value = 10
-  )
-  
+  # 
+  # 
+  # updateProgressBar(
+  #   session = session,
+  #   id = "DEProgress",
+  #   title = "Load Normalized Data",
+  #   value = 10
+  # )
+  # 
   #collect group information
   groupList <- variables$group
   group <- input$groups2
@@ -144,32 +135,36 @@ observeEvent(input$DETestType,{
   if(colnames(groupList)[1] == "Sample"){
     colnames(groupList)[1] <- tolower(colnames(groupList)[1])
   }
-  
-  #get the new group
-  variables$groupList <-
-    lapply(unique(groupList[,idx]), function(x) {
-      groupList[which(groupList[,idx] == x), ]$sample
-    })
-  names(variables$groupList) <- unique(groupList[,idx])
+
+  # get the new group
+  variables$groupList <- split(groupList$sample, groupList[, idx])
+  # 
+  # #get the new group
+  # Match samples in the group with sample in the data
   data.cl <- rep(0, ncol(variables$CountData))
-  
-  for (i in 1:length(variables$groupList)) {
-    data.cl[unlist(lapply(variables$groupList[[i]], convert2cl, df = variables$CountData))] <- names(variables$groupList[i])
+  # names(variables$groupList) <- unique(groupList[,idx])
+  # data.cl <- rep(0, ncol(variables$CountData))
+  # 
+  # 
+  for (i in seq_along(variables$groupList)) {
+    idx <- match(variables$groupList[[i]], colnames(variables$CountData))
+    data.cl[idx] <- names(variables$groupList)[i]
+    #print(names(variables$groupList)[i])
   }
-  
+  # 
   data.cl <- data.cl[data.cl!=0]
-  
-  normed_tcc <- data
+
+  normed_data <- data
   metaData1 <- reactive(variables$group)
-  data1 = reactive(list(data = as.data.frame(normed_tcc,),level = "protein"))
-  
-  updateProgressBar(
-    session = session,
-    id = "DEProgress",
-    title = "Pre-processing Data",
-    value = 20
-  )
-  
+  data1 = reactive(list(data = as.data.frame(normed_data),level = "protein"))
+
+  # updateProgressBar(
+  #   session = session,
+  #   id = "DEProgress",
+  #   title = "Pre-processing Data",
+  #   value = 20
+  # )
+  # 
   #preprocess
   # input different treatments
   # Selection of a data subset (highly variable), This subset is for analyses
@@ -180,14 +175,14 @@ observeEvent(input$DETestType,{
   pct = NULL
   res = preprocess(df, level, metric, pct)
   data2 = reactive(list(rawData = res$rawData, data = res$data, level = res$level, sampleInfo = dfSample))
-  
-  updateProgressBar(
-    session = session,
-    id = "DEProgress",
-    title = "Retrieve group information",
-    value = 30
-  )
 
+  # updateProgressBar(
+  #   session = session,
+  #   id = "DEProgress",
+  #   title = "Retrieve group information",
+  #   value = 30
+  # )
+  # 
   # Differentially expressed peptides/proteins
   # Data processing
   df = data2()$data
@@ -207,159 +202,140 @@ observeEvent(input$DETestType,{
     }
     #factors = c(input$group1select,input$group2select,input$group3select)
   }
-  
+
   #Store factors as global variables
   variables$factors <- factors
-  
 
-  
+
+
 
   #factors = unique(factors[!is.na(factors)])
   nGroups = length(factors)
-  
+
   for (g in 1:nGroups) {
     groupName = paste0("Group", g)
-    #comparison[g] = paste(dfSample$ID[dfSample[[input$groups2]] == factors[g]], collapse = ",")    # Oldest version
-    # comparison[g] = paste(dfSample[dfSample[[input$groups2]] == factors[g], 1], collapse = ",")
     cc = dfSample[dfSample[[input$groups2]] == factors[g], 1]
     cc <- unname(cc)
     cc <- unlist(cc)
     cc = cc[!is.na(cc)]
     comparison[g] = paste(cc, collapse = ",")
   }
+  ####added for test
+  data_imputed <- df
   
-  
-  updateProgressBar(
-    session = session,
-    id = "DEProgress",
-    title = "Imputation",
-    value = 40
-  )
-  
+  # 
+  # 
+  # updateProgressBar(
+  #   session = session,
+  #   id = "DEProgress",
+  #   title = "Imputation",
+  #   value = 40
+  # )
+  # 
   ############Imputation
-  nGroups = length(comparison)
-  groups = list()
-  nSamples = 0
-  samples = NULL
+  nGroups <- length(comparison)
+  groups <- list()
+  nSamples <- 0
+  samples <- NULL
+
   for (g in 1:nGroups) {
-    groups[[g]] = unlist(strsplit(comparison[g], ","))
-    nSamples = nSamples + length(groups[[g]])
+    groups[[g]] <- unlist(strsplit(comparison[g], ","))
+    nSamples <- nSamples + length(groups[[g]])
     samples[[g]] <- groups[[g]]
   }
-  
-  
-  group1=df[,samples[[1]]]
-  
-  group2=df[,samples[[2]]]
 
-  
-  data_imputation <- cbind(group1,group2)
-  
-  
-  #separate data into two groups
-  count_non_na_per_group_base <- function(data, group1, group2) {
-    count_group1 <- apply(group1, 1, function(x) sum(!is.na(x)))
-    count_group2 <- apply(group2, 1, function(x) sum(!is.na(x)))
-    result <- as.data.frame(cbind(count_group1,count_group2))
-    return(result)
+
+  grouplist <- list()
+  for (g in 1:nGroups) {
+    grouplist[[g]] <- df[, samples[[g]]]
   }
-  
-  #perform imputation if selected
-  # Count non-missing values for each group in each row
-  data_counts <- count_non_na_per_group_base(data_imputation, group1, group2)
-  
-  
-  
-  impute_data <- function(data, group1, group2,counts) {
-    
+
+  names(grouplist) <- paste0("group", seq_along(grouplist))
+  count_non_na_per_group <- as.data.frame(sapply(grouplist, function(x) {
+    apply(x, 1, function(y) sum(!is.na(y)))
+  }))
+
+  # Generalized imputation function for handling multiple groups with data
+  impute_data <- function(data, grouplist, count_non_na_per_group) {
+    nGroups <- length(grouplist)  # Number of groups
+    group_names <- names(grouplist)  # Group names: group1, group2, ..., groupN
+
     for (i in 1:nrow(data)) {
-      count1 <- counts$count_group1[i]
-      count2 <- counts$count_group2[i]
-      
-      idx1 <- match(colnames(group1),colnames(data))
-      
-      idx2 <- match(colnames(group2),colnames(data))
-      
-      # Case 1: Only one group has more than 1 non-missing value
-      if ((count1 > 1 && count2 < 1) || (count2 > 1 && count1 < 1)) {
-        if (count1 > 1 && count2 < 1) {
-          group_more <- group1
-          idx_more <- idx1
-          group_less <- group2
-          idx_less <- idx2
-        } else {
-          group_more <- group2
-          idx_more <- idx2
-          group_less <- group1
-          idx_less <- idx1
-        }
-        
-        diff <- abs(count1-count2)
-        diff <- min(diff,ncol(group_less),ncol(group_more))
-        
-        random_select_col <- sample(idx_less,diff)
-        for (j in random_select_col) {
-          data[i,j] <- min(data[j],na.rm = T)
-        }
+      counts <- count_non_na_per_group[i, ]
+
+      # Find indices for each group's samples in the data
+      idx <- lapply(1:nGroups, function(g) match(colnames(grouplist[[g]]), colnames(data)))
+
+      # Case 1: Handle groups with missing and available data
+      groups_with_data <- which(counts > 1)
+      groups_without_data <- which(counts < 1)
 
 
+
+      #if one group has more than one non-NA value and the other group has no value
+      if (length(groups_with_data) >= 1 && length(groups_without_data) > 0) {
+        group_more <- Reduce(cbind,grouplist[which(counts > 1)])
+        idx_more <- unlist(idx[groups_with_data])
+
+        for (g in groups_without_data) {  # Iterate over each group without data
+          group_less <- grouplist[[g]]
+          idx_less <- idx[[g]]
+
+          # Determine the difference in non-NA values between the groups
+          max_diff <- max(counts[counts!=0])
+          diff <- min(max_diff,ncol(group_less), min(sapply(grouplist, ncol)))
+
+          # Find the minimum value in each column of group_less
+          col_min_values <- sapply(idx_less, function(j) min(data[, j], na.rm = TRUE))
+
+
+
+          # Sort the minimum values and select the top n (smallest) values
+          top_n_mins <- sort(col_min_values, na.last = NA, decreasing = TRUE)[1:diff]
+
+          # # Randomly assign top n values into missing columns
+          # random_select_col <- sample(idx_less, diff)
+
+          for (j in 1:diff) {
+            col <- idx_less[j]
+            data[i, col] <- top_n_mins[j]
+          }
+        }
       }
-      
-      # Case 2: Both groups have less than 2 non-missing values
-      if (count1 <= 1 && count2 <= 1) {
+
+      # Case 2: All groups have less than 2 non-missing values
+      if (all(counts <= 1)) {
         data[i, ] <- NA  # Indicate to discard this row later
       }
-      
-      # Case 3: Both groups have more than 1 non-missing value
-      # No action needed
+
+      # Case 3: All groups have more than 1 non-missing value (do nothing)
     }
-    
-    # Discard rows with all NAs (case 2)
+
+    # Discard rows with all NAs (from case 2)
     data <- data[apply(data, 1, function(row) !all(is.na(row))), ]
-    
-    # Remove count columns before returning
-    data <- data[, !(names(data) %in% c("count_group1", "count_group2"))]
-    
+
     return(data)
   }
-  
-  
-  df <- cbind(variables$CountData[,c(1,2)],df)
-  #selection
+  # 
+  # Apply imputation or cleaning based on the selection
+  df <- cbind(variables$CountData[, c(1, 2)], df)
+
+  # Selection logic for imputation
   if (input$ImputationSelection == "Imputation") {
-    data_imputed <- impute_data(df, group1, group2,data_counts)
+    data_imputed <- impute_data(df, grouplist, count_non_na_per_group)
   } else if (input$ImputationSelection == "CleanData") {
-    data_imputed<-df[complete.cases(df[2:ncol(df)]),]
+    data_imputed <- df[complete.cases(df[2:ncol(df)]), ]
   } else {
-    data_imputed<-df
+    data_imputed <- df
   }
-  
-  description <- data_imputed[c(1,2)]
+
+   
+  # description <- data_imputed[c(1,2)]
   data_imputed <- data_imputed[-c(1,2)]
   #perform limma
   statRes = reactive(statTest(data_imputed, level, comparison,dfSample,data.cl,factors))
-  
-  updateProgressBar(
-    session = session,
-    id = "DEProgress",
-    title = "Calculate differentially expressed peptides/proteins",
-    value = 50
-  )
-  
-
-
-  # Show computation time notification
-  #runtime <- round(normed_tcc$DEGES$execution.time[3], 2)
-  
-  updateProgressBar(
-    session = session,
-    id = "DEProgress",
-    title = "Data Processing",
-    value = 60
-  )
-  
-  
-  # Data processing
+ 
+  # # Data processing
   shinyCatch({statres = statRes()})
   dfRaw = data2()$rawData
   exprs = statres$data
@@ -369,46 +345,33 @@ observeEvent(input$DETestType,{
   groupLabels = dfSample[[input$groups2]]
   groupLabels = groupLabels[!is.na(groupLabels)]
   #nGroups = length(unique(groupLabels))
-  
-  # Handle threshold inputs
+  # 
+  # # Handle threshold inputs
   logFC = 0
   sigMetric = "p-value"
   sigCutoff = 1
-  resLogFC = statres$res[, grep("Log2Fold", colnames(statres$res))]
+  resLogFC = statres$res[, grep("Log2Fold", colnames(statres$res)), drop = FALSE]
   if (nGroups > 2) {
     absLogFC = apply(cbind(abs(apply(resLogFC, 1, min)), abs(apply(resLogFC, 1, max))), 1, max)
   } else {
     absLogFC = abs(resLogFC)
   }
-  
+  # 
   # Select DE peptides/proteins and organize a dataset for subsequent analyses
   rowInd = which(statres$res[[sigMetric]] < sigCutoff & absLogFC >= logFC)
   if (nGroups == 2) {
-    exprs = cbind(description,exprs, `p-value` = statres$res$`p-value`, FDR = statres$res$FDR, Log2Fold = resLogFC)
+    exprs = cbind(variables$CountData[, c(1, 2)],exprs, `p-value` = statres$res$`p-value`, FDR = statres$res$FDR, Log2Fold = resLogFC)
   } else if (nGroups > 2) {
-    exprs = cbind(description,exprs, `p-value` = statres$res$`p-value`, FDR = statres$res$FDR)
+    exprs = cbind(variables$CountData[, c(1, 2)],exprs, `p-value` = statres$res$`p-value`, FDR = statres$res$FDR)
     exprs = cbind(exprs, resLogFC)
   }
   
-  subData2 = reactive(list(rawData = dfRaw, sampleInfo = dfSample, data = exprs))
-  
-  
-  res <- statRes()$res
-  #res <- res[order(res$`p-value`),]
-  result <- subData2()$data
-  compareName <- NULL
-  combMatrix = combn(seq(1, nGroups), 2)
-  for (i in 1:ncol(combMatrix)) {
-    compareName <- c(compareName, paste(factors[combMatrix[1, i]], "/", factors[combMatrix[2, i]], sep = ""))
-  }
-  ind <- grep("Log2Fold", colnames(result))
-  for (k in 1:length(ind)) {
-    colnames(result)[ind[k]] = paste("Log2Fold(", compareName[k], ")", sep = "")
-  }
+  result <- exprs
 
   
+  
   variables$result <- result
-  variables$res <- res
+  variables$res <- statres$res
   
   output$downloadDE <- downloadHandler(
     filename = "DEresult.csv",
@@ -417,55 +380,33 @@ observeEvent(input$DETestType,{
     }
   )
   
-  # write.csv(variables$res, "test/res.csv")
-  # write.csv(variables$result,"test/result.csv")
+  print(head(variables$result))
   
   # Render result table on the right top ----
   output$norm_resultTable <- DT::renderDataTable({
-    if (nrow(variables$result) == 0) {
-      DT::datatable(variables$result)
+    req(variables$result)
+    #invalidateLater(100, session)
+    
+    data <- variables$result
+    if (nrow(data) == 0) {
+      DT::datatable(data)
     } else {
-       data = variables$result
-       
-       # colInd = grep('^sig', colnames(data))
-       #data[, colInd] = formattable::comma(data[, colInd], digits = 3)
-       data$`p-value` = formatC(data$`p-value`, digits = 4, format = "e")
-       data$FDR = formatC(data$FDR, digits = 4,format = "e")
-       log2Ind = grep("Log2Fold", colnames(data))
-       colInd = c(3:(log2Ind[1]-3))
-       data[colInd] = round(data[colInd], digits = 4)
-       data[log2Ind] <- round(data[log2Ind],digits = 4)
+      #data = variables$result
+      data$`p-value` = formatC(data$`p-value`, digits = 4, format = "e")
+      data$FDR = formatC(data$FDR, digits = 4,format = "e")
+      log2Ind = grep("Log2Fold", colnames(data))
+      colInd = c(3:(log2Ind[1]-3))
+      data[colInd] = round(data[colInd], digits = 4)
+      data[log2Ind] <- round(data[log2Ind],digits = 4)
       DT::datatable(
         data,
         filter = "bottom",
         colnames = c("Uniprot ID" = 1),
-        # caption = tags$caption(
-        #   tags$li("Filter proteins by typing condictions (such as 2...5) in the filter boxes to filter numeric columns. ",
-        #           tags$b("Copy"),
-        #           ", ",
-        #           tags$b("Print"),
-        #           " and ",
-        #           tags$b("Download"),
-        #           " the filtered result for further analysis."
-        #   ),
-        #   tags$li(
-        #     HTML("<font color=\"#B22222\"><b>Protein ID</b></font> is colored according to FDR cut-off.")
-        #   )
-        # ),
+        
         selection = 'single',
         extensions = c("Scroller", "Buttons"),
         option = list(
           dom = 'lfrtip',
-          # buttons =
-          #   list(
-          #     'copy',
-          #     'print',
-          #     list(
-          #       extend = 'collection',
-          #       buttons = c('csv', 'excel', 'pdf'),
-          #       text = 'Download'
-          #     )
-          #   ),
           deferRender = TRUE,
           scrollY = 400,
           scrollX = TRUE,
@@ -482,13 +423,13 @@ observeEvent(input$DETestType,{
     }
   },server = T)
   
-  closeSweetAlert(session = session)
-  sendSweetAlert(
-    session = session,
-    title = "DONE",
-    text = "Differential Experssion analysis done.",
-    type = "success"
-  )
+  # closeSweetAlert(session = session)
+  # sendSweetAlert(
+  #   session = session,
+  #   title = "DONE",
+  #   text = "Differential Experssion analysis done.",
+  #   type = "success"
+  # )
   
   
   #store group information
@@ -496,24 +437,26 @@ observeEvent(input$DETestType,{
   groupList <- as.data.frame(variables$group)
   group <- input$groups2
   idx <- as.numeric(grep(group, colnames(groupList)))
-  
+
   factors <- variables$factors
-  
+
   selected = groupList[groupList[,idx] %in% factors,]
-  if(colnames(selected)[1] == "Sample"){
-    colnames(selected)[1] <- tolower(colnames(selected)[1])
-  }
-  
-  #get the new group
-  variables$groupList2 <-
-    lapply(unique(selected[,idx]), function(x) {
-      selected[which(selected[,idx] == x), ]$sample
-    })
-  names(variables$groupList2) <- unique(selected[,idx])
-  data.cl <- rep(0, ncol(variables$CountData))
-  
-  for (i in 1:length(variables$groupList2)) {
-    data.cl[unlist(lapply(variables$groupList2[[i]], convert2cl, df = variables$CountData))] <- names(variables$groupList2[i])
+  # Ensure the first column is named "sample" in lowercase
+  colnames(selected)[1] <- ifelse(colnames(selected)[1] == "Sample", "sample", colnames(selected)[1])
+
+
+  # #get the new group
+  #
+  #
+  # Generate new group list
+  variables$groupList2 <- split(selected$sample, selected[, idx])
+  # Initialize data.cl with zeros
+  data.cl <- numeric(ncol(variables$CountData))
+
+  # #assign each sample column with its group information
+  for (i in seq_along(variables$groupList2)) {
+    index <- match(variables$groupList2[[i]], colnames(variables$CountData))
+    data.cl[index] <- names(variables$groupList2)[i]
   }
   data.cl <- data.cl[data.cl !=0]
   
@@ -526,77 +469,69 @@ observeEvent(input$DETestType,{
 output$DEResultTable <- renderUI({
   if(DERun$DERunValue){
     tagList(
-    fluidRow(column(
-      12, 
-      downloadButton("downloadDE", "Download Result Table"),
-      DT::dataTableOutput('norm_resultTable') %>% withSpinner(),
-      plotlyOutput('normboxplot')%>% withSpinner()
-    )))} else {
-      helpText("Click [Run Differential Analysis] to obtain Result Table.")
-    }
+      fluidRow(column(
+        12, 
+        downloadButton("downloadDE", "Download Result Table"),
+        DT::dataTableOutput('norm_resultTable') %>% withSpinner(),
+        plotlyOutput('normboxplot')%>% withSpinner()
+      )))} else {
+        helpText("Click [Run Differential Analysis] to obtain Result Table.")
+      }
 })
 
 
 observeEvent(input$norm_resultTable_rows_selected,{
-  
+
   #input result data table after differential expression
   data <- variables$result
   #get only the values columns
   data = data %>% dplyr::select(-contains(c("Log2Fold","p-value","FDR")))
   colInd = c(3:ncol(data))
-  # colInd = grep('^sig', colnames(data))
-   data = data[, colInd]
-  
+  data = data[, colInd]
+
   #get the row index when clicking the row
   rowInd = input$norm_resultTable_rows_selected
-  
+
   #get group information
   groupList <- as.data.frame(variables$group)
   group <- input$groups2
   idx <- as.numeric(grep(group, colnames(groupList)))
 
-  #factors <- variables$factors
+  factors <- variables$factors
+  selected = groupList[,idx] %in% factors
 
-  #selected = groupList[groupList[,idx] %in% factors,]
+  colnames(groupList)[1] <- "sample"
 
-  if(colnames(groupList)[1] == "Sample"){
-    colnames(groupList)[1] <- tolower(colnames(groupList)[1])
-  }
-  
   #get the new group
-  variables$groupList <-
-    lapply(unique(groupList[,idx]), function(x) {
-      groupList[which(groupList[,idx] == x), ]$sample
-    })
-  
-  names(variables$groupList) <- unique(groupList[,idx])
-  
+  variables$groupList <- split(groupList$sample, groupList[, idx])
+
   data.cl <- rep(0, ncol(variables$CountData))
-  
-  for (i in 1:length(variables$groupList)) {
-    data.cl[unlist(lapply(variables$groupList[[i]], convert2cl, df = variables$CountData))] <- names(variables$groupList[i])
+  for (i in seq_along(variables$groupList)) {
+    idx                                                                                                                                                       <- match(variables$groupList[[i]], colnames(variables$CountData))
+    data.cl[idx] <- names(variables$groupList)[i]
   }
-  
+
+
   data.cl <- data.cl[data.cl!=0]
-  
+
   #Plot the bar plot when clicked on specific row
   output$normboxplot <- renderPlotly({
-    expr = as.numeric(data[rowInd, ])
-    df = data.frame(samples = colnames(data), intensity = round(expr,digits = 2))
+    expr = as.numeric(data[rowInd, selected])
+    df = data.frame(samples = colnames(data)[selected], intensity = round(expr,digits = 2))
     xOrder <-
-      data.frame("name" = df$samples, "group" = data.cl)
+      data.frame("name" = df$samples, "group" = data.cl[selected])
     xOrderVector <- unique(xOrder[order(xOrder$group), ]$name)
     xform <- list(
       categoryorder = "array",
       categoryarray = xOrderVector,
       title = ""
     )
-    
+
     plot_ly(
       data = df,
       x = ~samples,
       y = ~intensity,
-      color = as.factor(data.cl),
+      color = as.factor(data.cl[selected]),
       text = df$intensity,
       textposition = "outside",
       showlegend = FALSE,
@@ -614,10 +549,10 @@ observeEvent(input$norm_resultTable_rows_selected,{
           filename = row.names(data[rowInd,])
         )
       )
-    
+
   })
-  
-  
+
+
 })
 
 #################Plots##############
@@ -631,7 +566,7 @@ output$DE_distributionUI <- renderUI({
       numericInput(
         inputId = "DE_binsize",
         label = "Bin Size",
-        value = 100
+        value = 1000
       ),
       do.call(actionBttn, c(
         list(
@@ -641,77 +576,77 @@ output$DE_distributionUI <- renderUI({
         ),
         actionBttnParams
       ))
-),
-      column(
-        9,
-        plotlyOutput("DE_distributionPlot"),
-        tags$hr(),
-        downloadButton("downloadMSD", "Download MSD"),
-        tags$br(),
-        DT::dataTableOutput("MSDoutput")
-      )
+    ),
+    column(
+      9,
+      plotlyOutput("DE_distributionPlot"),
+      tags$hr(),
+      downloadButton("downloadMSD", "Download MSD"),
+      tags$br(),
+      DT::dataTableOutput("MSDoutput")
+    )
     )
   } else if(DERun$DERunValue && input$compareSelection == "multicomp"){
-      helpText("Distribution plot is only available for pairwise comparison.")
-    }
+    helpText("Distribution plot is only available for pairwise comparison.")
+  }
   else {
-      helpText("Click [Run Differential Analysis] to obtain Result Table.")
-    }
+    helpText("Click [Run Differential Analysis] to obtain Result Table.")
+  }
 })
 
 
-
+# 
 observeEvent(input$RunMovingSD,{
   #show notification of starting
   showNotification("Plotting Distribution...", type = "message")
-  
-  
-  #retreive data
-  data <- variables$result
-  
 
-  
+
+  #retreive differential expression result
+  data <- variables$result
+
+  #Keep only intensity value columns
   data = data %>% dplyr::select(-contains(c("p-value","FDR")))
   colInd = c(3:ncol(data))
   # colInd = grep('^sig', colnames(data))
   data = data[, colInd]
-  
+
   n = ncol(data)
-  
-  
-  #reorder data
+
+
+  #reorder data based on mean intensity
   data$mean_intensity = rowMeans(data[-ncol(data)],na.rm = T)
   data <- data[order(data$mean_intensity,decreasing = F),]
-  
 
-  
+
+
   #get input binsize
   binsize <- input$DE_binsize
-  
-  # Calculate rolling standard deviation
-  # rolling_sd <- rollapply(data$Log2Fold, 
-  #                         width = binsize, 
-  #                         by = 1, 
-  #                         FUN = sd, na.rm = T,
-  #                         align = 'right')
-  
+
+
   # Calculate mean of the standard deviations of the next 100 proteins
   end <- (nrow(data))-binsize+1
   moving_sd <- sapply(1:end, function(i) {
     last <- i+binsize-1
     sd(data$Log2Fold[i:last],na.rm = T)
   })
+
+  # For remaining proteins that bin size is not enough to cover, use the last moving SD for all larger proteins
   moving_sd_remain <- numeric(nrow(data) - end)
   moving_sd_remain[] <- moving_sd[length(moving_sd)]
   moving_sd <- c(moving_sd,moving_sd_remain)
+
+  #store moving SDs
   data$movingSD <- moving_sd
-  
+
   data_row_names=rownames(data)
-  
+
+  #organize data set
   data_reordered <- data[match(rownames(variables$result),data_row_names), ]
+  #calculate log2fc z score
+  data_reordered$logFC_z_score <- data_reordered$Log2Fold/data_reordered$movingSD
   data_MSD=cbind(data_reordered,variables$result[,c("p-value","FDR")])
 
-  
+
   #generate distribution plot based on SD
   output$DE_distributionPlot <- renderPlotly({
     p <- plot_ly(
@@ -726,8 +661,13 @@ observeEvent(input$RunMovingSD,{
         xaxis = list(title = "log2 protein intensity"),
         yaxis = list(title = "Moving SD",
                      range=c(0,1))
+      )%>%plotly::config(
+        toImageButtonOptions = list(
+          format = "svg",
+          filename = input$volplttitle
+        )
       )
-    
+
     p
   })
 
@@ -757,7 +697,7 @@ observeEvent(input$RunMovingSD,{
           scrollY = 400,
           scrollX = TRUE,
           scroller = TRUE,
-          
+
           pageLength = 5,
           searchHighlight = TRUE,
           orderClasses = TRUE,
@@ -765,7 +705,7 @@ observeEvent(input$RunMovingSD,{
             list(visible = TRUE, targets = -1)
           )
         )
-      )  
+      )
     }
   })
   output$downloadMSD <- downloadHandler(
@@ -774,7 +714,7 @@ observeEvent(input$RunMovingSD,{
       write.csv(data_MSD, file)
     }
   )
-  
+
   variables$DE_moving_sd <- data_MSD
 })
 
@@ -804,12 +744,12 @@ output$DE_distributionGroup <- renderUI({
   if (is.null(colnames(df))) {
     vars = NULL
   } else {
-    vars = colnames(df)[2: ncol(df)]    
+    vars = colnames(df)[2: ncol(df)]
   }
-  
+
   selectInput("log2fcGroup", "Select Grouping variable to calculate log2FC cutoff",
               choices = vars, selected = vars[1])
-  
+
 })
 
 output$DE_distributionGroup2 <- renderUI({
@@ -841,36 +781,57 @@ output$DE_distributionGroup2 <- renderUI({
       ))
     )
   ))
-  
-  
+
+
 })
 
-
+# 
 observeEvent(input$RunDistribution,{
   #show notification of starting
   showNotification("Plotting Distribution...", type = "message")
-  
-  
+
+
   #retreive data
   data <- variables$result
   choice <- input$log2fcGroupselect
   group_select <- input$log2fcGroup
-  
+
   data = data %>% dplyr::select(-contains(c("Log2Fold","p-value","FDR")))
   colInd = c(3:ncol(data))
   # colInd = grep('^sig', colnames(data))
   data = data[, colInd]
-  
-  #get group information
-  group <- variables$groupList[choice]
-  
+
+  #get group information ###change group structure
+  group <- variables$group
+  idx <- as.numeric(grep(group_select, colnames(group)))
+
+  #Unify first column format
+  colnames(group)[1] <- ifelse(colnames(group)[1] == "Sample", "sample", colnames(group)[1])
+
+  #get the new group
+  variables$SDwithinGroup <- split(group$sample, group[, idx])
+
+  names(variables$SDwithinGroup) <- unique(group[,idx])
+  data.cl <- numeric(ncol(variables$CountData))
+
+  for (i in seq_along(variables$SDwithinGroup)) {
+    ind <- match(variables$SDwithinGroup[[i]], colnames(variables$CountData))
+    data.cl[ind] <- names(variables$SDwithinGroup)[i]
+  }
+
+
+  data.cl <- data.cl[data.cl!=0]
+
   #select correlated samples
-  selected_samples <- unlist(group)
-  
+  selected <- variables$SDwithinGroup[choice]
+  selected_samples <- unlist(selected)
+
+
+  #retrieve required data
   data <- data[selected_samples]
   n = ncol(data)
-  
-  
+
+
   #calculate log2fc for each sample
   log2fc = data
   for (i in 1:(ncol(data) - 1)) {
@@ -878,16 +839,16 @@ observeEvent(input$RunDistribution,{
       log2fc[[paste0("log2FC(", names(data)[j], "/", names(data)[i],")")]] <- data[j] - data[[i]]
     }
   }
-  
+
   log2fc = log2fc[-c(1:n)]
-  
+
   #caluclate sd and mean for each sample log2fc
   sd <- apply(log2fc, 2, sd,na.rm = T)
   sd <- mean(sd)
   mean_logfc = apply(log2fc,2,mean,na.rm = T)
   mean_logfc <- mean(mean_logfc)
-  
-  
+
+
   #generate distribution plot based on SD and mean
   output$DE_SDdistPlot <- renderPlot({
     p <- ggplot()+
@@ -904,11 +865,11 @@ observeEvent(input$RunDistribution,{
       geom_vline(xintercept=sd,lty=4,col="blue",lwd=0.4)+
       geom_vline(xintercept=2*sd,lty=4,col="blue",lwd=0.4)+
       ggtitle("Simulated distribution of SDs")
-    
+
     p
   })
-  
-  
+
+
 })
 
 
@@ -925,7 +886,7 @@ output$DE_volcanoPlot <- renderUI({
         selectInput("metric2", 
                     label = "Select the measure of significance", 
                     choice = list("p-value" = "p-value", "FDR" = "FDR"), 
-                    selected = 1),
+                    selected = "p-value"),
         numericInput("pvalcutoff", 
                      label = "Significance level", 
                      min = 0, 
@@ -938,12 +899,14 @@ output$DE_volcanoPlot <- renderUI({
                      max = 2, 
                      step = 0.1,
                      value = 0.1),
+        #htmlOutput("upPreview"),
         numericInput("log2fcDown", 
                      label = "Downregulated Log2-fold cutoff", 
                      min = -2, 
                      max = 2, 
                      step = 0.1,
                      value = -0.1),
+        #htmlOutput("downPreview"),
         do.call(actionBttn, c(
           list(
             inputId = "RunVolcano",
@@ -966,7 +929,7 @@ output$DE_volcanoPlot <- renderUI({
             placeholder = "Input your protein accession number/Uniprot ID.\nOne protein each line"
           ),
           textInput(inputId = "volcxlab", 
-                    "X-axis Label", 
+                    "x-axis Label", 
                     value = paste("log<sub>2</sub>",txt)),
           sliderInput(
             "volcanoPointSize",
@@ -978,35 +941,35 @@ output$DE_volcanoPlot <- renderUI({
           ),
           spectrumInput(
             inputId = "downColor",
-            label = tagList("Down-regulated in G2", htmlOutput("downPreview")),
+            label = tagList("Down-regulated in the second group", htmlOutput("downPreview")),
             choices = list(
               list(
                 "#0000ff",
                 "green",
                 "black",
-                "white",
-                "blanchedalmond"
+                "grey30",
+                "white"
               ),
               as.list(brewer.pal(n = 9, name = "Blues")),
               as.list(brewer.pal(n = 9, name = "Greens")),
-              as.list(brewer.pal(n = 11, name = "Spectral"))
+              as.list(brewer.pal(n = 9, name = "Greys"))
             ),
             options = list(`toggle-palette-more-text` = "Show more")
           ),
           spectrumInput(
             inputId = "upColor",
-            label = tagList("Up-regulated in G2", htmlOutput("upPreview")),
+            label = tagList("Up-regulated in the second group", htmlOutput("upPreview")),
             choices = list(
               list(
                 "red",
                 "yellow",
                 "orange",
                 "white",
-                "darkblue"
+                "#0000ff"
               ),
               as.list(brewer.pal(n = 9, name = "Reds")),
               as.list(brewer.pal(n = 9, name = "Oranges")),
-              as.list(brewer.pal(n = 11, name = "Spectral"))
+              as.list(brewer.pal(n = 9, name = "Greys"))
             ),
             options = list(`toggle-palette-more-text` = "Show more")
           )
@@ -1014,7 +977,10 @@ output$DE_volcanoPlot <- renderUI({
       ),
       column(
         9,
-        plotlyOutput("volcanoPlot") %>% withSpinner(),
+        tagList(
+          downloadButton("downloadVolcanoTable", "Download DE Table"),
+          plotlyOutput("volcanoPlot") %>% withSpinner(),
+        ),
         tags$hr(),
         plotlyOutput("protBarPlotInVolcano") %>% withSpinner()
       )
@@ -1029,224 +995,249 @@ output$DE_volcanoPlot <- renderUI({
 
 
 #preview
-observeEvent(
-  {
-    input$RunVolcano
-  },
-  {
-    #Obtain the upper and lower log2fold change cutoff
-    DownCut <- input$log2fcDown
-    UpCut <- input$log2fcUp
-    pValCut <- input$pvalcutoff
-    sigmethod <- input$metric2
+observeEvent(input$RunVolcano, {
+  DownCut <- input$log2fcDown
+  UpCut <- input$log2fcUp
+  pValCut <- input$pvalcutoff
+  sigmethod <- input$metric2
+  
+  
+  print("******************")
+  print(DownCut)
+  print(input$log2fcUp)
+  print("******************")
+  
+  #import the result data table
+  res <- na.omit(variables$res)
+  result <- variables$result
+  result <- result[row.names(result) %in% row.names(res),]
+  
+  
+  if(sigmethod == "p-value"){
+    #get down part
+    DownProt <- nrow(res[res$Log2Fold <= DownCut & res$`p-value` <= pValCut,])
+    #get up part
+    UpProt <- nrow(res[res$Log2Fold >= UpCut & res$`p-value` <= pValCut,])
     
-    #import the result data table
-    res <- na.omit(variables$res)
-    result <- variables$result
-    result <- result[row.names(result) %in% row.names(res),]
+    #filter DE tables
+    DE_table <- result%>%
+      filter(
+        if_any(contains("Log2Fold"), ~ . >= UpCut | . <= DownCut)&
+          if_any(contains("p-value"), ~ . <= pValCut)
+      )
+  }else{
+    DownProt <- nrow(res[res$Log2Fold <= DownCut & res$`FDR` <= pValCut,])
+    UpProt <- nrow(res[res$Log2Fold >= UpCut & res$`FDR` <= pValCut,])
     
-    
-    if(sigmethod == "p-value"){
-      #get down part
-      DownProt <- nrow(res[res$Log2Fold <= DownCut & res$`p-value` <= pValCut,])
-      #get up part
-      UpProt <- nrow(res[res$Log2Fold >= UpCut & res$`p-value` <= pValCut,])
-    }else{
-      DownProt <- nrow(res[res$Log2Fold <= DownCut & res$`FDR` <= pValCut,])
-      UpProt <- nrow(res[res$Log2Fold >= UpCut & res$`FDR` <= pValCut,])
+    DE_table <- result %>%
+      filter(
+        if_any(contains("Log2Fold"), ~ . >= UpCut | . <= DownCut)&
+          if_any(contains("FDR"), ~ . <= pValCut)
+      )
+  }
+  
+  
+  
+  
+  output$downPreview <- renderText({
+    paste0(
+      "<font color=\"",
+      input$downColor,
+      "\"><b>",
+      DownProt,
+      " proteins</b></font>"
+    )
+  })
+  
+  output$upPreview <- renderText({
+    paste0(
+      "<font color=\"",
+      input$upColor,
+      "\"><b>",
+      UpProt,
+      " proteins</b></font>"
+    )
+  })
+  
+  output$downloadVolcanoTable <- downloadHandler(
+    filename = "DifferentialExpressed_volcano.csv",
+    content = function(file){
+      write.csv(DE_table, file)
+    }
+  )
+  
+  output$volcanoPlot <- renderPlotly({
+    # Preparation of the statistical testing result for visualization
+    # Check the number of groups for comparison, and move forward to the volcano plot
+    if(dim(res)[2] > 3){
+      sendSweetAlert(
+        session = session,
+        title = "ERROR",
+        text = "Volcano Plot is unavailable for multiple comparison now.",
+        type = "info"
+      )
     }
     
     
+    #input filter parameters
+    sigMetric = input$metric2
+    sigCutoff = input$pvalcutoff
     
+    #remove the unnecessary column
+    if (sigMetric == "p-value") {
+      res[, 3] = NULL
+      ylab = "-log10(p-value)"
+    } else if (sigMetric == "FDR") {
+      res[, 2] = NULL
+      ylab = "-log10(FDR)"
+    }
+    colnames(res) = c("logfc", "significance")
     
-    output$downPreview <- renderText({
-      paste0(
-        "<font color=\"",
-        input$downColor,
-        "\"><b>",
-        DownProt,
-        " proteins</b></font>"
+    res$color <- "None"
+    
+    #Assign colors to each protein
+    if(DownProt!=0){
+      res[which(res$logfc <= DownCut & res$significance <= sigCutoff),]$color <- "Down"
+    }else{
+      sendSweetAlert(
+        session = session,
+        type = "warning",
+        title = "Warning",
+        text = "No down regulated protein is filtered."
       )
-    })
-    
-    output$upPreview <- renderText({
-      paste0(
-        "<font color=\"",
-        input$upColor,
-        "\"><b>",
-        UpProt,
-        " proteins</b></font>"
+    }
+    if(UpProt!=0){
+      res[which(res$logfc >= UpCut & res$significance <= sigCutoff),]$color <- "Up"
+    }else{
+      sendSweetAlert(
+        session = session,
+        type = "warning",
+        title = "Warning",
+        text = "No up regulated protein is filtered."
       )
-    })
+    }
     
     
+    level <- factor(res$color)
+    levels(level) <- list(
+      "Down" = 0,
+      "None" = 1,
+      "Up" = 2
+    )
     
-    output$volcanoPlot <- renderPlotly({
-      # Preparation of the statistical testing result for visualization
-      # Check the number of groups for comparison, and move forward to the volcano plot
-      if(dim(res)[2] > 3){
-        sendSweetAlert(
-          session = session,
-          title = "ERROR",
-          text = "Volcano Plot is unavailable for multiple comparison now.",
-          type = "info"
-        )
+    #input volcano plot parameters
+    xlab = input$volcxlab
+    xmin = min(res$logfc)
+    xmax = max(res$logfc)
+    ymin = 0
+    ymax = max(-log10(res$significance))
+    
+    #############Label User interested Proteins#############
+    
+    res$GN <- result$GN
+    selectList <- row.names(res) %in% unlist(strsplit(x = input$labelProt, split = "[\r\n]"))
+    top_prots <- res[selectList,]
+    
+    # Add gene labels for all of the top genes we found
+    # here we are creating an empty list, and filling it with entries for each row in the dataframe
+    # each list entry is another list with named items that will be used by Plot.ly
+    a <- list()
+    for (i in seq_len(nrow(top_prots))) {
+      m <- top_prots[i, ]
+      # Conditional positioning and coloring based on log2fold change
+      if (m[["logfc"]] < 0) {
+        # Negative log2fold: annotate on the left
+        ax_pos <- -20
+      } else {
+        # Positive log2fold: annotate on the right
+        ax_pos <- 20
       }
       
-      
-      #input filter parameters
-      sigMetric = input$metric2
-      sigCutoff = input$pvalcutoff
-      
-      #remove the unnecessary column
-      if (sigMetric == "p-value") {
-        # res = res[, 2:3]
-        res[, 3] = NULL
-        ylab = "-log10(p-value)"
-      } else if (sigMetric == "FDR") {
-        # res = res[, c(2, 4)]
-        res[, 2] = NULL
-        ylab = "-log10(FDR)"
+      # Conditional coloring based on fold change cutoffs
+      if (m[["logfc"]] < DownCut) {
+        text_color <- "blue"
+      } else if (m[["logfc"]] > UpCut) {
+        text_color <- "red"
+      } else {
+        text_color <- "black"  # Default color for genes between cutoffs
       }
-      colnames(res) = c("logfc", "significance")
-      
-      res$color <- "None"
-      
-      if(DownProt!=0){
-        res[which(res$logfc <= DownCut & res$significance <= sigCutoff),]$color <- "Down"
-      }else{
-        sendSweetAlert(
-          session = session,
-          type = "warning",
-          title = "Warning",
-          text = "No down regulated protein is filtered."
-        )
-      }
-      if(UpProt!=0){
-        res[which(res$logfc >= UpCut & res$significance <= sigCutoff),]$color <- "Up"
-      }else{
-        sendSweetAlert(
-          session = session,
-          type = "warning",
-          title = "Warning",
-          text = "No up regulated protein is filtered."
-        )
-      }
-
-      
-      level <- factor(res$color)
-      levels(level) <- list(
-        "Down" = 0,
-        "None" = 1,
-        "Up" = 2
+      a[[i]] <- list(
+        x = m[["logfc"]],
+        y = -log10(m[["significance"]]),
+        text = m$GN,
+        xref = "x",
+        yref = "y",
+        showarrow = TRUE,
+        arrowhead = 4,
+        arrowsize = 0.5,
+        ax = ax_pos,
+        ay = -20,
+        font = list(color = text_color)
       )
-      
-      #input volcano plot parameters
-      xlab = input$volcxlab
-      xmin = min(res$logfc)
-      xmax = max(res$logfc)
-      ymin = 0
-      ymax = max(-log10(res$significance))
-      
-      #############Label User interested Proteins#############
-      
-      res$GN <- result$GN
-      selectList <- row.names(res) %in% unlist(strsplit(x = input$labelProt, split = "[\r\n]"))
-      top_prots <- res[selectList,]
-      
-      
-      # # Find and label the top 10 proteins
-      # res$GN <- result$GN
-      # uprows <- res %>% filter(color %in% "Up")
-      # top10_up <- head(uprows[order(uprows$logfc,decreasing = T),], 5)
-      # downrows <- res %>% filter(color %in% "Down")
-      # top10_down <- head(downrows[order(downrows$logfc),], 5)
-      # top_prots <- rbind(top10_up,top10_down)
-      
-      # Add gene labels for all of the top genes we found
-      # here we are creating an empty list, and filling it with entries for each row in the dataframe
-      # each list entry is another list with named items that will be used by Plot.ly
-      a <- list()
-      for (i in seq_len(nrow(top_prots))) {
-        m <- top_prots[i, ]
-        a[[i]] <- list(
-          x = m[["logfc"]],
-          y = -log10(m[["significance"]]),
-          text = m$GN,
-          xref = "x",
-          yref = "y",
-          showarrow = TRUE,
-          arrowhead = 4,
-          arrowsize = 0.5,
-          ax = 20,
-          ay = -20
-        )
-      }
-
-      #add annotation
-      annotation <- row.names(res)
-      
-      # Volcano plot using plotly
-      fig <- plot_ly(
-        data = res,
-        source = "volcano"
-      )%>%add_trace(
-        x = ~logfc, 
-        y = ~-log10(significance),
-        type = "scatter", 
-        mode = "markers",
-        color = ~level,
-        colors = c(input$downColor, "black", input$upColor), 
-        text = result$GN,
-        marker = list(size = input$volcanoPointSize,
-                      opacity = 0.7),
-        hovertemplate = paste("ID: %{text}",
-                              "<br>Log2fold: %{x:.4f}", 
-                              "<br>sig. level: %{y}<extra></extra>"),
-        key = ~annotation,
-        showlegend = F
-      )%>%layout(
-        annotations = a
-      )%>%plotly::config(
-          toImageButtonOptions = list(
-            format = "svg",
-            filename = input$volplttitle
-          )
-        )
-      
-      fig = fig %>% add_segments(x = DownCut, xend = DownCut, y = ymin, yend = ymax, 
-                                 line = list(dash = "dash", color = "black"),
-                                 showlegend = FALSE)
-      fig = fig %>% add_segments(x = UpCut, xend = UpCut, y = ymin, yend = ymax, 
-                                 line = list(dash = "dash", color = "black"),
-                                 showlegend = FALSE)
-      fig = fig %>% add_segments(x = xmin - 0.5, xend = xmax + 0.5, y = -log10(sigCutoff), yend = -log10(sigCutoff), 
-                                 line = list(dash = "dash", color = "black"),
-                                 showlegend = FALSE)
-      fig = fig %>% layout(yaxis = list(title = ylab,range = c(ymin, ymax + 0.5),
-                                         linecolor = "rgba(0, 0, 0, 0)", linewidth = 0.5, ticks = "outside", mirror = TRUE),
-                           xaxis = list(title = xlab,range = c(xmin - 0.5, xmax + 0.5),
-                                        linecolor = "rgba(0, 0, 0, 0)", linewidth = 0.5, ticks = "outside", mirror = TRUE),
-                           title = input$volplttitle,
-                           showlegend = FALSE)
-      variables$volcano <- fig
-      fig
-      
-    })
-    volrun$volrunval <- T
-  }
-  
-)
-
+    }
+    
+    #add annotation
+    annotation <- row.names(res)
+    
+    # Volcano plot using plotly
+    fig <- plot_ly(
+      data = res,
+      source = "volcano"
+    )%>%add_trace(
+      x = ~logfc, 
+      y = ~-log10(significance),
+      type = "scatter", 
+      mode = "markers",
+      color = ~level,
+      colors = c(input$downColor, "#D4D4D4", input$upColor), 
+      text = result$GN,
+      marker = list(size = input$volcanoPointSize,
+                    opacity = 0.7),
+      hovertemplate = paste("ID: %{text}",
+                            "<br>Log2fold: %{x:.4f}", 
+                            "<br>sigficance: %{y}<extra></extra>"),
+      key = ~annotation,
+      showlegend = F
+    )%>%layout(
+      annotations = a
+    )%>%plotly::config(
+      toImageButtonOptions = list(
+        format = "svg",
+        filename = input$volplttitle
+      )
+    )
+    
+    fig = fig %>% add_segments(x = DownCut, xend = DownCut, y = ymin, yend = ymax, 
+                               line = list(dash = "dash", color = "black"),
+                               showlegend = FALSE)
+    fig = fig %>% add_segments(x = UpCut, xend = UpCut, y = ymin, yend = ymax, 
+                               line = list(dash = "dash", color = "black"),
+                               showlegend = FALSE)
+    fig = fig %>% add_segments(x = xmin - 0.5, xend = xmax + 0.5, y = -log10(sigCutoff), yend = -log10(sigCutoff), 
+                               line = list(dash = "dash", color = "black"),
+                               showlegend = FALSE)
+    fig = fig %>% layout(yaxis = list(title = ylab,range = c(ymin, ymax + 0.5),
+                                      linecolor = "rgba(0, 0, 0, 0)", linewidth = 0.5, ticks = "outside", mirror = TRUE),
+                         xaxis = list(title = xlab,range = c(xmin - 0.5, xmax + 0.5),
+                                      linecolor = "rgba(0, 0, 0, 0)", linewidth = 0.5, ticks = "outside", mirror = TRUE),
+                         title = input$volplttitle,
+                         showlegend = FALSE)
+    variables$volcano <- fig
+    fig
+    
+  })
+  volrun$volrunval <- TRUE
+})
 
 #This function renders a bar plot when use mouse to click on each point
 output$protBarPlotInVolcano <- renderPlotly({
   # Read in hover data
   eventdata <- event_data("plotly_click", source = "volcano")
-  validate(need(
-    !is.null(eventdata),
-    "Click the point to show protein's signal level of interest."
-  ))
+  shiny::req(eventdata)
+  # validate(need(
+  #   !is.null(eventdata),
+  #   "Click the point to show protein's signal level of interest."
+  # ))
   # Get point number
   prot_id <- eventdata$key
   # Get expression level (Original)
@@ -1255,22 +1246,28 @@ output$protBarPlotInVolcano <- renderPlotly({
   # Get expression level (Normalized)
   expressionNor <-
     variables$result[row.names(variables$result) == prot_id, ]
-  colInd = c(3:ncol(expressionNor))
+  colInd = c(1:ncol(expressionNor))
   # colInd = grep('^sig', colnames(expressionNor))
-  expressionNor <- expressionNor[,colInd]
+  
   
   #get group list
   data.cl <- rep(0, ncol(variables$CountData))
   
-  for (i in 1:length(variables$groupList2)) {
-    data.cl[unlist(lapply(variables$groupList2[[i]], convert2cl, df = variables$CountData))] <- names(variables$groupList2[i])
+  for (i in seq_along(variables$groupList2)) {
+    idx <- match(variables$groupList2[[i]], colnames(variables$CountData))
+    data.cl[idx] <- names(variables$groupList2)[i]
   }
-  data.cl <- data.cl[data.cl !=0]
+  
+  
+  #data.cl = data.cl[-c(1,2)]
+  colInd <- colInd[which(data.cl!=0)]
   
   #order the expression data
-  expression <- t(expressionNor[which(data.cl != 0)])
+  expression <- t(expressionNor[colInd])
+  #expression <- expressionNor[,3:ncol(expression)]
   expression <- round(expression,digits = 2)
   
+  data.cl = data.cl[data.cl!=0]
   xOrder <-
     data.frame("name" = row.names(expression), "group" = data.cl)
   xOrderVector <- unique(xOrder[order(xOrder$group), ]$name)
@@ -1305,8 +1302,6 @@ output$protBarPlotInVolcano <- renderPlotly({
   
 })
 
-
-
 #------------------HEATMAP-----------------
 #Heatmap
 
@@ -1322,7 +1317,7 @@ output$DE_dendUI <- renderUI({
         if(HeatmapRun$heatmapRunValue){
           tagList(
             downloadButton("downloadHeatmap", "Download Heatmap Table"),
-            plotlyOutput("heatmap", height = HeatmapRun$height)%>% withSpinner()
+            plotlyOutput("heatmap", height = input$heatmapHeight)%>% withSpinner()
           )
         }
         else{
@@ -1345,7 +1340,7 @@ output$heatmapParameter <- renderUI({
       choices = c(
         "List" = "By_list",
         "FDR" = "By_FDR",
-        "Top" = "topPercent"
+        "P-val" = "By_pval"
       ),
       justified = TRUE,
       status = "primary"
@@ -1394,12 +1389,6 @@ output$heatmapParameter <- renderUI({
                   "Column" = "column"),
       selected = "both"
     ),
-    selectInput(
-      inputId = "colorSelectionMethod",
-      label = "Color Selection Method",
-      choices = c("Color map", "Two colors", "Three colors")
-    ),
-    uiOutput("heatmapColorSelectionPanel"),
     sliderInput(
       "heatmapColorNumber",
       "Select the number of colors to be in the palette",
@@ -1408,8 +1397,6 @@ output$heatmapParameter <- renderUI({
       step = 1,
       value = 20
     ),
-    tags$b("Color Preview"),
-    plotOutput("colorPreview", height = "20px"),
     numericInput(
       inputId = "heatmapHeight",
       label = "Height of Heatmap",
@@ -1426,9 +1413,18 @@ output$heatmapParameter <- renderUI({
       label = "Show Row Label?",
       value = F),
     checkboxInput(
+      inputId = "rowlabelUpper",
+      label = "Upper-case row labels?",
+      value = F),
+    checkboxInput(
       inputId = "showdendrow",
       label = "Show Row Dendrogram?",
       value = T),
+    checkboxInput(
+      inputId = "hm_NA",
+      label = "Remove protein/peptides with NA values?",
+      value = F
+    ),
     
     do.call(actionBttn, c(
       list(
@@ -1437,15 +1433,27 @@ output$heatmapParameter <- renderUI({
         icon = icon("play")
       ),
       actionBttnParams
-  )))
+    )))
 })
-
 
 # Preview proteins count -----
 observeEvent(input$heatmapFDR, {
   res <- variables$result
+  res <- res[!is.na(res$FDR), ]
   prot_count <-
     nrow(res[res$FDR <= input$heatmapFDR, ])
+  output$heatmapProteinPreview <- renderText({
+    paste0(
+      "Protein number: ",
+      prot_count
+    )
+  })
+})
+observeEvent(input$topProt, {
+  res <- variables$result
+  res <- res[!is.na(res$"p-value"), ]
+  prot_count <-
+    nrow(res[res$"p-value" <= input$topProt, ])
   output$heatmapProteinPreview <- renderText({
     paste0(
       "Protein number: ",
@@ -1465,178 +1473,37 @@ output$heatmapSelectProt <- renderUI({
       rows = 5,
       placeholder = "Input uniprot ID (first column in the dataset), one protein id per line."
     ),
-    "By_FDR" = tagList(
-      tagList(
-        sliderInput(
-          "heatmapFDR",
-          "FDR Cut-off",
-          min = 0.01,
-          max = 1,
-          value = 0.01
-        ),
-        textOutput("heatmapProteinPreview")
-      )
+    "By_FDR" = tagList(numericInput(
+      "heatmapFDR",
+      "FDR Cut-off",
+      min = 0.01,
+      max = 1,
+      value = 0.01
     ),
-    "topPercent" = numericInput(
+    textOutput("heatmapProteinPreview")),
+    "By_pval" = tagList(numericInput(
       inputId = "topProt",
-      label = "Top Selected Proteins",
-      value = 100,
+      label = "P value cut-off",
+      value = 0.05,
       min = 0,
-      max = nprotein,
-      step = 10
-    )
-  )
-    
-})
-
-observeEvent(input$colorSelectionMethod, {
-  output$heatmapColorSelectionPanel <- renderUI({
-    switch(input$colorSelectionMethod,
-           "Color map" = {
-             selectInput(
-               "heatmapColor",
-               "Choose Colormap",
-               choices = list(
-                 "PiYG", "PRGn", "BrBG", "PuOr", "OrRd",
-                 "Oranges", "RdGy", "RdBu", "RdYlBu", "RdYlGn", 
-                 "Spectral", "coolwarm"
-               ),
-               selected = "RdBu"
-             )
-           },
-           "Two colors" = createColorSelectors(),
-           "Three colors" = createColorSelectors(includeMiddle = TRUE)
-    )
-  })
-})
-
-createColorSelectors <- function(includeMiddle = FALSE) {
-  tagList(
-    spectrumInput(
-      inputId = "heatmapTwoColorLow",
-      label = "Low",
-      choices = list(
-        list(
-          "blue", "black", "gray30", "white", "blanchedalmond",
-          "#2066a8", "#3594cc", "forestgreen"
-        ),
-        as.list(brewer.pal(n = 9, name = "Blues")),
-        as.list(brewer.pal(n = 9, name = "Greens")),
-        as.list(brewer.pal(n = 11, name = "Spectral")),
-        as.list(brewer.pal(n = 8, name = "Dark2"))
-      ),
-      options = list(`toggle-palette-more-text` = "Show more")
+      max = 1,
+      step = 0.01
     ),
-    if (includeMiddle) {
-      spectrumInput(
-        inputId = "heatmapTwoColorMiddle",
-        label = "Middle",
-        choices = list(
-          list(
-            "white", "gray50", "blanchedalmond", "steelblue", 
-            "#0000FF", "forestgreen"
-          ),
-          as.list(brewer.pal(n = 9, name = "Blues")),
-          as.list(brewer.pal(n = 9, name = "Greens")),
-          as.list(brewer.pal(n = 11, name = "Spectral")),
-          as.list(brewer.pal(n = 8, name = "Dark2"))
-        ),
-        options = list(`toggle-palette-more-text` = "Show more")
-      )
-    },
-    spectrumInput(
-      inputId = "heatmapTwoColorHigh",
-      label = "High",
-      choices = list(
-        list(
-          "red", "brown", "orange", "white", "steelblue", 
-          "forestgreen"
-        ),
-        as.list(brewer.pal(n = 9, name = "Blues")),
-        as.list(brewer.pal(n = 9, name = "Greens")),
-        as.list(brewer.pal(n = 11, name = "Spectral")),
-        as.list(brewer.pal(n = 8, name = "Dark2"))
-      ),
-      options = list(`toggle-palette-more-text` = "Show more")
-    )
+    textOutput("heatmapProteinPreview"))
+    
   )
-}
-
-colorPanel <- reactive({
-  if (input$colorSelectionMethod == "Color map" && length(input$heatmapColor) > 0) {
-    colorPal <- switch(
-      input$heatmapColor,
-      "PiYG" = rev(PiYG(input$heatmapColorNumber)),
-      "PRGn" = PRGn(input$heatmapColorNumber),
-      "BrBG" = BrBG(input$heatmapColorNumber),
-      "PuOr" = PuOr(input$heatmapColorNumber),
-      "OrRd" = OrRd(input$heatmapColorNumber),
-      "Oranges" = Oranges(input$heatmapColorNumber),
-      "RdGy" = rev(RdGy(input$heatmapColorNumber)),
-      "RdBu" = rev(RdBu(input$heatmapColorNumber)),
-      "RdYlBu" = rev(RdYlBu(input$heatmapColorNumber)),
-      "RdYlGn" = rev(RdYlGn(input$heatmapColorNumber)),
-      "Spectral" = Spectral(input$heatmapColorNumber),
-      "coolwarm" = cool_warm(input$heatmapColorNumber)
-    )
-  } else if (input$colorSelectionMethod == "Two colors" && length(input$heatmapTwoColorLow) > 0) {
-    colorPal <- colorRampPalette(c(input$heatmapTwoColorLow, input$heatmapTwoColorHigh))(input$heatmapColorNumber)
-  } else if (input$colorSelectionMethod == "Three colors" && length(input$heatmapTwoColorLow) > 0) {
-    colorPal <- colorRampPalette(c(input$heatmapTwoColorLow, input$heatmapTwoColorMiddle, input$heatmapTwoColorHigh))(input$heatmapColorNumber)
-  } else {
-    colorPal <- c("white")
-  }
   
-  colorPal
 })
-
-output$colorPreview <- renderPlot({
-  colorPal <- colorPanel()
-  op <- par(mar = c(0.5, 0, 0, 0))
-  plot(
-    c(0, length(colorPal)),
-    c(0, 1),
-    type = "n",
-    xlab = "",
-    ylab = "",
-    ann = FALSE,
-    bty = "n",
-    xaxt = "n",
-    yaxt = "n"
-  )
-  rect(0:(length(colorPal) - 1), 0, 1:(length(colorPal)), 1, col = colorPal, lwd = 0)
-  par(op)
-})
-
-
 
 observeEvent(input$heatmapRun,{
-  progressSweetAlert(
-    session = session,
-    id = "heatmapProgress",
-    title = "Work in progress",
-    display_pct = TRUE,
-    value = 0
-  )
+  HeatmapRun$heatmapRunValue = FALSE
   
-  updateProgressBar(
-    session = session,
-    id = "heatmapProgress",
-    title = "Processing data",
-    value = 10
-  )
   
   data <- variables$result
   res <- variables$res
   dfSample = variables$sampleInfo
-  colorPal <- colorPanel()
   
-  updateProgressBar(
-    session = session,
-    id = "heatmapProgress",
-    title = "Processing selected lists",
-    value = 30
-  )
+  
   
   #get the selected number of proteins for analysis
   if(input$heatmapProtSelectType == "By_list"){
@@ -1652,10 +1519,9 @@ observeEvent(input$heatmapRun,{
     
     updateSliderInput(session = session,inputId = "heatmapFDR",value = input$heatmapFDR)
   }
-  else if(input$heatmapProtSelectType == "topPercent"){
-    topProt <- input$topProt
-    tempdata <- data[order(data$`p-value`), ]
-    sampleData <- tempdata[1:topProt,]
+  else if(input$heatmapProtSelectType == "By_pval"){
+    pvalCut <- input$topProt
+    sampleData <- data[which(data$'p-value' <= pvalCut),]
     
     updateNumericInput(session = session,inputId = "topProt",value = input$topProt)
   }
@@ -1668,12 +1534,7 @@ observeEvent(input$heatmapRun,{
     )
     return()
   }
-  updateProgressBar(
-    session = session,
-    id = "heatmapProgress",
-    title = "Updating parameters",
-    value = 50
-  )
+  
   
   #filter with Log2Fold threshold
   log2f <- input$heatmap_log2fc
@@ -1689,68 +1550,80 @@ observeEvent(input$heatmapRun,{
     filter(if_any(contains("Log2Fold"), ~ . <= -log2f))
   selectList <- row.names(sampleData) %in% row.names(log2filterDown)
   df2 <- sampleData[selectList,]
-  
-  
+  # 
+  # 
   #merge datasets
-  sampleData <- merge(df1,df2,by = "row.names", all = TRUE, suffixes = c(".Up", ".Down"))
-  rownames(sampleData) <- sampleData$Row.names
-  sampleData <- sampleData[ , -1] # Remove the Row.names column
-  sampleData <- sampleData[1:ncol(data)]
-  colnames(sampleData) <- colnames(data)
+  overlapping_rows <- rownames(df1)[rownames(df1) %in% rownames(df2)]
+  non_overlapping_rows <- rownames(df2)[!rownames(df2) %in% rownames(df1)]
+  sampleData <- rbind(df1, df2[non_overlapping_rows, ])
   
-  
-  #update input values
-  updateNumericInput(session = session,inputId = "heatmap_log2fc",value = input$heatmap_log2fc)
-  updateNumericInput(session = session, inputId = "heatmapHeight", value = input$heatmapHeight)
-  updateTextInput(session = session, inputId = "heatmapTitle", value = input$heatmapTitle)
-  
+  # 
+  # #update input values
+  # updateNumericInput(session = session,inputId = "heatmap_log2fc",value = input$heatmap_log2fc)
+  # updateNumericInput(session = session, inputId = "heatmapHeight", value = input$heatmapHeight)
+  # updateTextInput(session = session, inputId = "heatmapTitle", value = input$heatmapTitle)
+  # 
   #remove unnecessary columns
   sampleData = sampleData %>% dplyr::select(-contains(c("Log2Fold","p-value","FDR")))
   sampleData = sampleData[3:ncol(sampleData)]
-
+  
+  # filter by selected groups
+  groupList <- variables$groupList2
+  selected = unlist(groupList,use.names = F)
+  # 
+  sampleData = sampleData[,selected]
+  if(input$rowlabelUpper == TRUE) {
+    row.names(sampleData) <- toupper(row.names(sampleData))
+    updateCheckboxInput(session, "rowlabelUpper", value = TRUE)
+  }
+  # 
   #change to heatmap format
   mat = as.matrix(sampleData)
   
-  #check NAs
-  giveNAs = which(is.na(as.matrix(dist(mat))),arr.ind=TRUE)
-  tab = sort(table(c(giveNAs)),decreasing=TRUE)
-  checkNA = sapply(1:length(tab),function(i){
-    sum(is.na(as.matrix(dist(mat[-as.numeric(names(tab[1:i])),]))))
-  })
-  rmv = names(tab)[1:min(which(checkNA==0))]
-  
-  mat <- mat[complete.cases(mat),]
-  mat = mat[-as.numeric(rmv),]
-  
-  mat = t(scale(t(mat), center = T, scale = F)) # Only mean-centering
-  
+  # 
+  if(input$hm_NA == T) mat <- mat[complete.cases(mat),]
+  # #mat <- mat[complete.cases(mat),]
+  # 
+  # 
+  # #mat = t(scale(t(mat)))
+  # 
   output$downloadHeatmap <- downloadHandler(
     filename = "heatmap.csv",
     content = function(file) {
       write.csv(mat, file)
     }
   )
-  
-  
+  # 
+  # 
+  #heatmap parameters
+  #hm_scale = input$hm_scale
+  #title = input$heatmapTitle
+  rowdend = input$showdendrow
+  rowlabelshow = input$showrowlabel
+  # 
+  # 
   #plot heatmap
   output$heatmap <- renderPlotly({
-    isolate(HeatmapRun$height <- input$heatmapHeight)
+    #isolate(HeatmapRun$height <- input$heatmapHeight)
     p <- heatmaply(
       mat,
       #k_col = length(variables$factors),
-      colors = colorPal,
+      colors = rev(RdBu(input$heatmapColorNumber)),
       na.value = "grey50",
-      na.rm = TRUE,
+      na.rm = T,
+      Colv = F,
+      Rowv = F,
       dist_method = input$heatmapDist,
       hclust_method = input$heatmapCluster,
       xlab = "Sample",
       ylab = "Protein ID",
       dendrogram = input$dendCompute,
-      showticklabels=c(TRUE, input$showrowlabel),
-      show_dendrogram = c(input$showdendrow, T),
+      showticklabels=c(TRUE, rowlabelshow),
+      show_dendrogram = c(rowdend, T),
       main = input$heatmapTitle,
-      key.title = "z score"
-      )%>%
+      key.title = "z score",
+      scale = "row"
+    )%>%
       plotly::config(
         toImageButtonOptions = list(
           format = "svg",
@@ -1761,26 +1634,6 @@ observeEvent(input$heatmapRun,{
     p
   })
   
-  
-  updateProgressBar(
-    session = session,
-    id = "heatmapProgress",
-    title = "Extracting data",
-    value = 90
-  )
-  updateProgressBar(
-    session = session,
-    id = "heatmapProgress",
-    title = "All done",
-    value = 100
-  )
   HeatmapRun$heatmapRunValue <- input$heatmapRun
-  closeSweetAlert(session = session)
-  sendSweetAlert(
-    session = session,
-    title = "Completed!",
-    type = "success"
-  )
-  
   
 })

@@ -1,1 +1,0 @@
-sample,group,sex,Agesig126,Group1,F,17sig127N,Group1,M,30sig127C,Group2,M,21sig128N,Group2,F,27sig128C,Group1,F,36sig129N,Group1,M,40sig129C,Group2,F,22sig130N,Group2,M,24

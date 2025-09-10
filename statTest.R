@@ -5,7 +5,7 @@ library(limma)
 ## Subroutines  ##
 ##################
 limmaTest <- function(data, level, samples, contrasts, comparison, comparisonNames, design, contMatrix) {
-    subData = data[, which(colnames(data) %in% samples)]
+    #subData = data[, which(colnames(data) %in% samples)]
     nGroups = length(comparison)
     fit = lmFit(data, design) ## Log2-transformation
     fit = contrasts.fit(fit, contMatrix)
@@ -76,7 +76,7 @@ statTest = function (data, level, comparison,group,conditions,compareLevel) {
     
     
     groupinfo <- data.frame(
-      row.names = group$Sample,
+      row.names = group$sample,
       condition = factor(conditions)
     )
     
@@ -108,7 +108,8 @@ statTest = function (data, level, comparison,group,conditions,compareLevel) {
         idx1 = combMatrix[1,j]
         idx2 = combMatrix[2,j]
         contVec = c(contVec, paste(compareLevel[idx1], compareLevel[idx2], sep = "-"))
-        comparisonNames = c(comparisonNames, paste(comparison[combMatrix[1, j]], "/", comparison[combMatrix[2, j]], sep = ""))
+        comparisonNames <- c(comparisonNames,paste(compareLevel[idx1], compareLevel[idx2], sep = "/"))
+        #comparisonNames = c(comparisonNames, paste(comparison[combMatrix[1, j]], "/", comparison[combMatrix[2, j]], sep = ""))
     }
     contMatrix = makeContrasts(contrasts = contVec, levels = design)
     

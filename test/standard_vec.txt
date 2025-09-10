@@ -1,3 +1,0 @@
-"V1" "V2" "V3"
-"1" "batch1" "sig126" "standard"
-"6" "batch2" "sig129N" "non_standard"

@@ -23,18 +23,18 @@ fluidPage(
         )
       ),
       box(
-        title = tagList(icon("cogs"), "Experiment settings"),
+        title = tagList(icon("cogs"), "Experiment Settings"),
         status = "primary",
         width = NULL,
         solidHeader = TRUE,
-        selectInput("experiment_type", "Experiment Type", choices = c("Label-Free", "TMT")),
+        selectInput("experiment_type", "Experiment Type", choices = c("Label-free", "TMT-labeling")),
         numericInput(inputId = "batch_volume", label = "Number of all samples in a batch", value = 0),
         numericInput("n_IRs", "No. of IR (Internal Reference) samples in a batch", value = 0),
         sliderInput("n_iterations", "Optimization level", value = 100, min = 50, max = 1000),
         do.call(actionBttn, c(
           list(
             inputId = "run",
-            label = "Run experiment design",
+            label = "Run Experiment Design",
             icon = icon("play")
           ),
           actionBttnParams
@@ -51,12 +51,12 @@ fluidPage(
             width = NULL,
             solidHeader = TRUE,
             status = "primary",
-            DT::dataTableOutput("inputData")
+            uiOutput("pre_inputData")
           )),
         column(
           width = 4,
           box(
-            title = tagList(icon("table"), "Factor distributions"),
+            title = tagList(icon("bar-chart"), "Factor Distributions"),
             width = NULL,
             solidHeader = TRUE,
             status = "primary",
@@ -65,15 +65,15 @@ fluidPage(
         )
       ),
       box(
-        title = tagList(icon("table"), "Batch and channel assignation"),
+        title = tagList(icon("table"), "Batch and Channel Assignation"),
         width = NULL,
         solidHeader = TRUE,
         status = "primary",
-        DT::dataTableOutput("sample_batch"),
+        uiOutput("pre_sample_batch"),
         downloadButton("download_all", label = "Download all results")
       ),
       box(
-        title = tagList(icon("table"), "Batch design matrix"),
+        title = tagList(icon("table"), "Batch Design Matrix"),
         width = NULL,
         solidHeader = TRUE,
         status = "primary",

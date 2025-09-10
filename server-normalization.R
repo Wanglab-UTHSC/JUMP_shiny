@@ -12,17 +12,20 @@ library(dplyr)
 #source('commandLineArgs.R')
 
 # normalize Batche effects By Internal Standard
-normalizeBatchesByInternalStandard=function(tb,bch,std) {
-  norm=tb
-  goldStd=as.character(std[std[,3]=='standard',2])
+normalizeBatchesByInternalStandard = function(tb, bch, std) {
+  norm = tb
+  goldStd = as.character(std[std[, 3] == 'standard', 2])
   for (i in 1:nrow(std)) {
-    if (std[i,3] == 'non_standard') {
-      bchStandard=as.character(std[i,2])
-      f=tb[,goldStd]-tb[,bchStandard]
-      crt=as.character(std[i,1])
+    if (std[i, 3] == 'non_standard') {
+      bchStandard = as.character(std[i, 2])
+      f = tb[, goldStd] - tb[, bchStandard]
+      # print(f)
+      f[is.na(f)] <- 0
+      # print(f)
+      crt = as.character(std[i, 1])
       #smp=grep(crt,bch) # bug here
-      smp=which(bch==crt)# corrected on 6/19/19
-      norm[,smp]=tb[,smp]+f
+      smp = which(bch == crt)# corrected on 6/19/19
+      norm[, smp] = tb[, smp] + f
     }
   }
   return(norm)
@@ -32,27 +35,27 @@ normalizeBatchesByInternalStandard=function(tb,bch,std) {
 # Credit to Nurcan Tuncbag from MIT
 #args=(commandArgs(TRUE))
 for (e in commandArgs(T)) {
-  ta = strsplit(e,"=",fixed=TRUE)
+  ta = strsplit(e, "=", fixed = TRUE)
   var = ta[[1]][1]
-  if(! is.na(ta[[1]][2])) {
+  if (!is.na(ta[[1]][2])) {
     temp = ta[[1]][2]
-    var = substr(ta[[1]][1],2,nchar(ta[[1]][1]))
-    if(substr(ta[[1]][1],nchar(ta[[1]][1]),nchar(ta[[1]][1])) == "I") {
+    var = substr(ta[[1]][1], 2, nchar(ta[[1]][1]))
+    if (substr(ta[[1]][1], nchar(ta[[1]][1]), nchar(ta[[1]][1])) == "I") {
       temp = as.integer(temp)
     }
-    if(substr(ta[[1]][1],nchar(ta[[1]][1]),nchar(ta[[1]][1])) == "N") {
+    if (substr(ta[[1]][1], nchar(ta[[1]][1]), nchar(ta[[1]][1])) == "N") {
       temp = as.numeric(temp)
     }
-    if(substr(ta[[1]][1],nchar(ta[[1]][1]),nchar(ta[[1]][1])) == "V") {
-      temp = strsplit(temp,',')[[1]]
+    if (substr(ta[[1]][1], nchar(ta[[1]][1]), nchar(ta[[1]][1])) == "V") {
+      temp = strsplit(temp, ',')[[1]]
     }
-    assign(var,temp)
-    cat("assigned ",var," the value of |",temp,"|\n")
+    assign(var, temp)
+    cat("assigned ", var, " the value of |", temp, "|\n")
   } else {
-    var_fields = strsplit(var,'-')[[1]]
+    var_fields = strsplit(var, '-')[[1]]
     var = var_fields[length(var_fields)]
-    assign(var,TRUE)
-    cat("assigned ",var," the value of TRUE\n")
+    assign(var, TRUE)
+    cat("assigned ", var, " the value of TRUE\n")
   }
 }
 
@@ -64,149 +67,127 @@ for (e in commandArgs(T)) {
 normRun <- reactiveValues(normRunValue = FALSE)
 #v$importActionValue <- F
 
+output$batchSelect <- renderUI({
+  metaData1 <- variables$group
+  df = metaData1
+  if (is.null(colnames(df))) {
+    vars = NULL
+  } else {
+    vars = colnames(df)[2:ncol(df)]
+  }
+  
+  selectInput("group_batch",
+              "Batch selection",
+              choices = vars,
+              selected = vars[1])
+})
+
+output$internalReference <- renderUI({
+  metaData1<- variables$group
+  df = metaData1
+  if (is.null(colnames(df))) {
+    vars = NULL
+  } else {
+    vars = colnames(df)[2:ncol(df)]
+  }
+  if (input$normalization == "internalNM" || input$normalization == "internal_linearNM") {
+    selectInput(
+      inputId = "intRefCol",
+      label = "Internal reference column",
+      choices = vars,
+      selected = vars[1]
+    )
+  }
+})
+
+
 #if the batchlist is uploaded
 observeEvent(input$confirmedBatchList, {
-  progressSweetAlert(
-    session = session,
-    id = "batchNormProgress",
-    title = "Read in raw data",
-    display_pct = TRUE,
-    value = 0
-  )
   
   rawdata <- variables$CountData
-  write.csv(rawdata,"test/Rawdata.csv")
   
   
-  updateProgressBar(
-    session = session,
-    id = "batchNormProgress",
-    title = "Batch Effect Elimination",
-    value = 10
-  )
   
   #run batch effect elimination
-  tb=rawdata
-  tb <- tb[c(-1,-2)]
+  tb = rawdata
+  tb <- tb[c(-1, -2)]
   
-  smallValue=1
-  tb=log2(tb+smallValue)
-  
-  write.csv(tb,"test/tb_transformed.csv")
+  smallValue = 1
+  tb = log2(tb + smallValue)
   
   
-  updateProgressBar(
-    session = session,
-    id = "batchNormProgress",
-    title = "Get Batch list",
-    value = 20
-  )
   
-  if (input$batchSelectViaText == "") {
-    sendSweetAlert(
-      session = session,
-      title = "ERROR",
-      text = "Please input group information!",
-      type = "error"
-    )
-    return()
-  }
+  
   
   #input the batch group list from user
-  batchinput <- reactive({
-    input$batchSelectViaText
-  })
+  batchgroup <- input$group_batch
   
-  updateProgressBar(
-    session = session,
-    id = "batchNormProgress",
-    title = "Calculating normalization factors",
-    value = 40
-  )
+  groupList <- variables$group
+  
+  idx <- as.numeric(grep(batchgroup, colnames(groupList)))
+  if (colnames(groupList)[1] == "Sample") {
+    colnames(groupList)[1] <- tolower(colnames(groupList)[1])
+  }
+  
+  #get the new group
+  variables$batchGroupList <-split(groupList$sample, groupList[, idx])
+  #names(variables$batchGroupList) <- unique(groupList[, idx])
+  
+  #get the batch group
+  batchgroup <- groupList[, c(1, idx)]
+  colnames(batchgroup) <- c("sample", "batch")
+  
+
   
   
-  batchgroup <- data.frame(fread(batchinput(), header = FALSE,fill = T))
-  batchgroup <- batchgroup[-1,]
-  variables$batchGroupList <- batchgroup
-  # 
-  variables$batchGroupList <-
-    lapply(unique(batchgroup$V2), function(x) {
-      batchgroup[batchgroup$V2 == x, ]$V1
-    })
-  names(variables$batchGroupList) <- unique(batchgroup$V2)
+  batch_vector = as.data.frame(batchgroup$batch)
+  bch = as.vector(batch_vector[, 1])
+
   
-  batch_vector=as.data.frame(batchgroup$V2)
-  bch=as.vector(batch_vector[,1])
-  
-  write.table(batchgroup,"test/batchgroup.txt")
   
   # Normalize data based on selection
-  updateProgressBar(
-    session = session,
-    id = "batchNormProgress",
-    title = "Performing Normalization",
-    value = 60
-  )
   
   #get the internal information
-  if (input$normalization == 'internalNM') {
-    tryCatch(
-      {
-        trans= as.data.frame(cbind(batchgroup$V2,batchgroup$V1,batchgroup$V3))
-      },
-      error = function(e) {
-        sendSweetAlert(
-          session = session,
-          title = "Input data error!",
-          text = as.character(message(e)),
-          type = "error"
-        )
-        return()
-      },
-      warning = function(w) {
-        sendSweetAlert(
-          session = session,
-          title = "Input data warning!",
-          text = "Some error is in your group info, it maybe cause some problem we cannot expected.",
-          type = "warning"
-        )
-        return()
-      }
-    )
+  if (input$normalization == 'internalNM' || input$normalization=='internal_linearNM') {
+    idx <- as.numeric(grep(input$intRefCol, colnames(groupList)))
+    interRef <- groupList[, idx]
+    trans = as.data.frame(cbind(batchgroup$batch, batchgroup$sample, interRef))
+    standard_vector = trans[trans$interRef == "internal", ]
+    standard_vector$interRef[1] = "standard"
+    standard_vector$interRef[2:nrow(standard_vector)] <- "non_standard"
     
-    standard_vector = trans[trans$V3 == "internal",]
-    standard_vector$V3[1] = "standard"
-    standard_vector$V3[2:nrow(standard_vector)] <- "non_standard"
-    write.table(standard_vector,"test/standard_vec.txt")
+    norm = normalizeBatchesByInternalStandard(tb, bch, standard_vector)
+    if(input$normalization == 'internal_linearNM'){
+      norm = removeBatchEffect(norm, bch)
+    }
+
     
-    norm=normalizeBatchesByInternalStandard(tb,bch,standard_vector)
-  } else{ if (input$normalization == 'linearNM') {
-    norm=removeBatchEffect(tb,bch)
-  }}
+  } else{
+    if (input$normalization == 'linearNM') {
+      norm = removeBatchEffect(tb, bch)
+    }
+  }
   
-  norm <- 2^norm
+  norm <- 2 ^ norm
   
-  updateProgressBar(
-    session = session,
-    id = "batchNormProgress",
-    title = "Saving normalized data",
-    value = 80
-  )
   #save the normalized data
-  variables$normedData <- cbind(variables$CountData[,c(1,2)],norm)
-  write.csv(norm,"test/norm.csv")
+  variables$normedData <- cbind(variables$CountData[, c(1, 2)], norm)
   
   data.cl <- rep(0, ncol(variables$normedData))
-  for (i in 1:length(variables$batchGroupList)) {
-    data.cl[unlist(lapply(variables$batchGroupList[[i]], convert2cl, df = variables$normedData))] <- names(variables$batchGroupList[i])
+  for (i in seq_along(variables$batchGroupList)) {
+    indices <- match(variables$batchGroupList[[i]], colnames(variables$normedData))
+    data.cl[indices] <- names(variables$batchGroupList)[i]
   }
+  # for (i in 1:length(variables$batchGroupList)) {
+  #   data.cl[unlist(lapply(variables$batchGroupList[[i]], convert2cl, df = variables$normedData))] <- names(variables$batchGroupList[i])
+  # }
   
   # Storage convert group list to local
   variables$batchGroupListConvert <- data.cl
   
   
-
-  variables$normed.count.data <- variables$normedData[,data.cl != 0]
+  
+  variables$normed.count.data <- variables$normedData[, data.cl != 0]
   variables$normed.count.data <- as.matrix(variables$normed.count.data)
   
   group2 <- data.cl[data.cl != 0]
@@ -216,18 +197,11 @@ observeEvent(input$confirmedBatchList, {
   variables$normed_group_import <- group2
   
   
-  normRun$normRunValue <- input$confirmedBatchList
+  normRun$normRunValue <- TRUE
   
   
-  updateProgressBar(
-    session = session,
-    id = "batchNormProgress",
-    title = "Form Data Table",
-    value = 90
-  )
-  
-  tbtoshow <- round(norm,digits = 2)
-  tbtoshow <- cbind(variables$CountData[,c(1,2)],tbtoshow)
+  tbtoshow <- round(norm, digits = 2)
+  tbtoshow <- cbind(variables$CountData[, c(1, 2)], tbtoshow)
   # Render normalized result table on the right top ----
   output$downloadnorm <- downloadHandler(
     filename = "normalized_data.csv",
@@ -237,14 +211,9 @@ observeEvent(input$confirmedBatchList, {
   )
   
   output$normTable <- DT::renderDataTable({
-    # brks <-
-    #   quantile(rawdata %>% select_if(is.numeric),
-    #            probs = seq(.05, .95, .05),
-    #            na.rm = TRUE
-    #   )
     DT::datatable(
       tbtoshow,
-      colnames = c("UniProt ID" = 1),
+      colnames = c("Accession Number" = 1),
       extensions = c("Scroller", "RowReorder"),
       option = list(
         rowReorder = TRUE,
@@ -256,40 +225,28 @@ observeEvent(input$confirmedBatchList, {
         orderClasses = TRUE
       )
     )
-  }, server = FALSE)
+  }, server = T)
   
   
-  updateProgressBar(
-    session = session,
-    id = "batchNormProgress",
-    title = "Export Data Table",
-    value = 100
-  )
   
-  closeSweetAlert(session = session)
-  sendSweetAlert(
-    session = session,
-    title = "DONE",
-    text = "Normalization was successfully performed.",
-    type = "success"
-  )
   
 })
 
 # Render DataTable of row data proteins ----
 output$normalizationResultTable <- renderUI({
-  if (nrow(variables$CountData) == 0) {
-    tags$p("No data to show. Click", tags$code("Example"), "or", tags$code("Upload"), "your own dataset.")
-  } else {
+  if(normRun$normRunValue){
     tagList(
       fluidRow(column(
-        12,
-        downloadButton("downloadnorm", "Download Normalized Table"),
-        DT::dataTableOutput("normTable")%>% withSpinner()
-      ))
-    )
-  }
+        12, 
+        downloadButton("downloadnorm", "Download Result Table"),
+        DT::dataTableOutput('normTable') %>% withSpinner()
+      )))} else {
+        helpText("Click [Run Normalization] to obtain Result Table.")
+      }
 })
+
+
+
 
 
 
@@ -300,8 +257,11 @@ output$normed_sampleDistributionBox <- renderPlotly({
   if (length(variables$normed.count.data) > 0) {
     normed_data <- variables$normed.count.data
     
+    normed_data <- as.data.frame(log2(normed_data))
+    
     # Filter
-    log2data <- normed_data %>% filter_all(all_vars(. > input$normed_sampleDistributionFilterLow | is.na(.)))
+    log2data <- normed_data %>% filter_all(all_vars(. > input$normed_sampleDistributionFilterLow |
+                                                      is.na(.)))
     
     data_stack <- data.frame(stack(log2data))
     
@@ -317,15 +277,19 @@ output$normed_sampleDistributionBox <- renderPlotly({
     
     p <- plot_ly(
       data = data,
-      x = ~ind,
-      y = ~value,
+      x = ~ ind,
+      y = ~ values,
       type = "box",
-      split = ~group,
-      color = ~group
+      split = ~ group,
+      color = ~ group
     ) %>%
       layout(
         title = input$norm_sampleDistributionTitle,
-        xaxis = list(title = input$norm_sampleDistributionXlab, categoryarray = "array", categoryarray = ~col),
+        xaxis = list(
+          title = input$norm_sampleDistributionXlab,
+          categoryarray = "array",
+          categoryarray = ~ col
+        ),
         yaxis = list(title = input$norm_sampleDistributionYlab)
       ) %>%
       config(
@@ -346,8 +310,6 @@ output$normed_sampleDistributionDensity <- renderPlotly({
   if (length(variables$normed.count.data) > 0) {
     normed_data <- variables$normed.count.data
     if (input$norm_densityFilter != "Do not filter") {
-      # count <-
-      #   filterLowCountproteins(tcc, low.count = as.numeric(input$densityFilter))$count
       count <-
         normed_data[rowSums(normed_data) > as.numeric(input$norm_densityFilter), ]
     } else {
@@ -357,7 +319,7 @@ output$normed_sampleDistributionDensity <- renderPlotly({
     
     group <- variables$normed_group_import
     densityTable <- apply(data, 2, function(x) {
-      density(x)
+      density(na.omit(x))
     })
     p <- plot_ly(type = "scatter", mode = "lines")
     for (i in 1:length(densityTable)) {
@@ -396,7 +358,9 @@ output$norm_sampleDistributionDensityPanel <- renderUI({
       column(
         3,
         popify(
-          helpText("Filter proteins with a total read count smaller than thresholds."),
+          helpText(
+            "Filter proteins with a total read count smaller than thresholds."
+          ),
           title = "Reference",
           content = 'Sultan, Marc, et al. <a href="http://science.sciencemag.org/content/321/5891/956">"A global view of protein activity and alternative splicing by deep sequencing of the human transcriptome."</a> <i>Science</i> 321.5891 (2008): 956-960.',
           placement = "left"
@@ -488,7 +452,6 @@ output$norm_lowCountFilterByCutoff <- renderPlotly({
     lowCount <-
       sapply(0:input$lowCountSlide, function(x) {
         sum(rowSums(normed_data) > x)
-        # nrow(filterLowCountproteins(tcc, low.count = x)$count)
       })
     
     lowCountdt <- data.frame(
@@ -500,9 +463,9 @@ output$norm_lowCountFilterByCutoff <- renderPlotly({
     plot_ly(
       lowCountdt,
       name = "Remain",
-      x = ~Cutoff,
-      y = ~Remain,
-      text = ~Remain,
+      x = ~ Cutoff,
+      y = ~ Remain,
+      text = ~ Remain,
       textposition = "outside",
       hoverinfo = "text+name",
       hovertext = ~ paste0(
@@ -520,8 +483,8 @@ output$norm_lowCountFilterByCutoff <- renderPlotly({
     ) %>%
       add_trace(
         name = "Filtered",
-        y = ~Filtered,
-        text = ~Filtered,
+        y = ~ Filtered,
+        text = ~ Filtered,
         type = "bar",
         textposition = "inside"
       ) %>%
@@ -532,10 +495,7 @@ output$norm_lowCountFilterByCutoff <- renderPlotly({
         yaxis = list(title = "Protein number")
       ) %>%
       config(
-        toImageButtonOptions = list(
-          format = "svg",
-          filename = "Filtering_Threshold_for_Low_Count_Proteins"
-        )
+        toImageButtonOptions = list(format = "svg", filename = "Filtering_Threshold_for_Low_Count_Proteins")
       )
   } else {
     return()
@@ -549,17 +509,17 @@ output$norm_lowCountFilterByCutoffUI <- renderUI({
       column(
         3,
         popify(
-          helpText("Filter proteins with tota intensity smaller than thresholds."),
-          title = "Reference",
-          content = 'Sultan, Marc, et al. <a href="http://science.sciencemag.org/content/321/5891/956">"A global view of protein activity and alternative splicing by deep sequencing of the human transcriptome."</a> <i>Science</i> 321.5891 (2008): 956-960.',
+          helpText(
+            "Filter proteins with tota intensity smaller than thresholds."
+          ),
           placement = "left"
         ),
         sliderInput(
           inputId = "lowCountSlide",
           label = "Max threshold",
-          min = 3,
-          max = 50,
-          value = 15,
+          min = 1,
+          max = 35,
+          value = 20,
           step = 1
         )
       ),
@@ -583,17 +543,19 @@ output$normed_pcaPlotObjectScree <- renderPlotly({
       normed_data <- normed_data
     }
     normed_data <- normed_data[apply(normed_data, 1, var) != 0, ]
-    if (!is.na(input$normed_pcaTopprotein) & input$normed_pcaTopprotein < nrow(normed_data)) {
+    if (!is.na(input$normed_pcaTopprotein) &
+        input$normed_pcaTopprotein < nrow(normed_data)) {
       normed_data <- t(normed_data[order(apply(normed_data, 1, var), decreasing = TRUE)[1:input$normed_pcaTopprotein], ])
     }
     
-    data.pca.all <- prcomp(normed_data,
-                           center = input$normed_pcaCenter,
-                           scale. = input$normed_pcaScale
+    data.pca.all <- prcomp(
+      normed_data,
+      center = input$normed_pcaCenter,
+      scale. = input$normed_pcaScale
     )
     summaryTable <- summary(data.pca.all)$importance
-    if(ncol(summaryTable) > 8){
-      summaryTable <- summaryTable[,1:8]
+    if (ncol(summaryTable) > 8) {
+      summaryTable <- summaryTable[, 1:8]
     }
     p <- plot_ly(
       x = colnames(summaryTable),
@@ -611,10 +573,7 @@ output$normed_pcaPlotObjectScree <- renderPlotly({
       ) %>%
       layout(
         xaxis = list(title = "Principal Components"),
-        yaxis = list(
-          title = "Proportion of Variance",
-          tickformat = "%"
-        ),
+        yaxis = list(title = "Proportion of Variance", tickformat = "%"),
         title = "Scree Plot",
         legend = list(
           orientation = "h",
@@ -623,12 +582,7 @@ output$normed_pcaPlotObjectScree <- renderPlotly({
           y = 1.05
         )
       ) %>%
-      config(
-        toImageButtonOptions = list(
-          format = "svg",
-          filename = "Scree_Plot"
-        )
-      )
+      config(toImageButtonOptions = list(format = "svg", filename = "Scree_Plot"))
     variables$normed_screePlot <- p
     p
   } else {
@@ -646,13 +600,13 @@ output$normed_pcaPlotObject3d <- renderPlotly({
       data <- data
     }
     data <- data[apply(data, 1, var) != 0, ]
-    if (!is.na(input$normed_pcaTopprotein) & input$normed_pcaTopprotein < nrow(data)) {
+    if (!is.na(input$normed_pcaTopprotein) &
+        input$normed_pcaTopprotein < nrow(data)) {
       data <- t(data[order(apply(data, 1, var), decreasing = TRUE)[1:input$normed_pcaTopprotein], ])
     }
     data.pca.all <- prcomp(data,
                            center = input$normed_pcaCenter,
-                           scale. = input$normed_pcaScale
-    )
+                           scale. = input$normed_pcaScale)
     
     data <- data.frame(data.pca.all$x)
     data$name <- rownames(data)
@@ -662,35 +616,36 @@ output$normed_pcaPlotObject3d <- renderPlotly({
     importance <- summary(data.pca.all)$importance
     
     #label sample names or not
-    if(input$normed_pcaLabel){
+    if (input$normed_pcaLabel) {
       mode <- "markers+text"
-    }else{
+    } else{
       mode <- "markers"
     }
     
     p <- plot_ly(
       data = data,
-      x = ~PC1,
-      y = ~PC2,
-      z = ~PC3,
+      x = ~ PC1,
+      y = ~ PC2,
+      z = ~ PC3,
       color = ~ factor(group),
-      text = ~name,
+      text = ~ name,
       textposition = "top right",
       type = "scatter3d",
       mode = mode
     ) %>%
       layout(title = "PCA Plot (3D)",
              scene = list(
-               xaxis = list(title = (paste0("PC1(",round(importance[2,1]*100,digits = 2),"%)"))),
-               yaxis = list(title = (paste0("PC2(",round(importance[2,2]*100,digits = 2),"%)"))),
-               zaxis = list(title = (paste0("PC3(",round(importance[3,2]*100,digits = 2),"%)")))
+               xaxis = list(title = (paste0(
+                 "PC1(", round(importance[2, 1] * 100, digits = 2), "%)"
+               ))),
+               yaxis = list(title = (paste0(
+                 "PC2(", round(importance[2, 2] * 100, digits = 2), "%)"
+               ))),
+               zaxis = list(title = (paste0(
+                 "PC3(", round(importance[3, 2] * 100, digits = 2), "%)"
+               )))
              )) %>%
-      config(
-        toImageButtonOptions = list(
-          format = "svg",
-          filename = "PCA_Plot_in_3D"
-        )
-      )
+      config(toImageButtonOptions = list(format = "svg", filename = "PCA_Plot_in_3D"))
     variables$normed_pca3d <- p
     p
   } else {
@@ -707,13 +662,13 @@ output$normed_pcaPlotObject2d <- renderPlotly({
       data <- data
     }
     data <- data[apply(data, 1, var) != 0, ]
-    if (!is.na(input$normed_pcaTopprotein) & input$normed_pcaTopprotein < nrow(data)) {
+    if (!is.na(input$normed_pcaTopprotein) &
+        input$normed_pcaTopprotein < nrow(data)) {
       data <- t(data[order(apply(data, 1, var), decreasing = TRUE)[1:input$normed_pcaTopprotein], ])
     }
     data.pca.all <- prcomp(data,
                            center = input$normed_pcaCenter,
-                           scale. = input$normed_pcaScale
-    )
+                           scale. = input$normed_pcaScale)
     data <- data.frame(data.pca.all$x)
     data$name <- rownames(data)
     group <- variables$normed_group_import
@@ -723,32 +678,33 @@ output$normed_pcaPlotObject2d <- renderPlotly({
     
     
     #label sample names or not
-    if(input$normed_pcaLabel){
+    if (input$normed_pcaLabel) {
       mode <- "markers+text"
-    }else{
+    } else{
       mode <- "markers"
     }
     
     p <- plot_ly(
       data = data,
-      x = ~PC1,
-      y = ~PC2,
+      x = ~ PC1,
+      y = ~ PC2,
       color = ~ factor(group),
-      text = ~name,
+      text = ~ name,
       textposition = "top right",
       type = "scatter",
       mode = mode,
       marker = list(size = 8)
     ) %>%
-      layout(title = "PCA Plot (2D)",
-             xaxis = list(title = (paste0("PC1(",round(importance[2,1]*100,digits = 2),"%)"))),
-             yaxis = list(title = (paste0("PC2(",round(importance[2,2]*100,digits = 2),"%)")))) %>%
-      config(
-        toImageButtonOptions = list(
-          format = "svg",
-          filename = "PCA_Plot_in_2D"
-        )
-      )
+      layout(
+        title = "PCA Plot (2D)",
+        xaxis = list(title = (paste0(
+          "PC1(", round(importance[2, 1] * 100, digits = 2), "%)"
+        ))),
+        yaxis = list(title = (paste0(
+          "PC2(", round(importance[2, 2] * 100, digits = 2), "%)"
+        )))
+      ) %>%
+      config(toImageButtonOptions = list(format = "svg", filename = "PCA_Plot_in_2D"))
     variables$normed_pca2d <- p
     p
   } else {
@@ -766,20 +722,13 @@ output$normed_pcaSummaryObject <- DT::renderDataTable({
       data <- data
     }
     data <- data[apply(data, 1, var) != 0, ]
-    if (!is.na(input$normed_pcaTopprotein) & input$normed_pcaTopprotein < nrow(data)) {
+    if (!is.na(input$normed_pcaTopprotein) &
+        input$normed_pcaTopprotein < nrow(data)) {
       data <- t(data[order(apply(data, 1, var), decreasing = TRUE)[1:input$normed_pcaTopprotein], ])
     }
     data.pca.all <- prcomp(data,
                            center = input$normed_pcaCenter,
-                           scale. = input$normed_pcaScale
-    )
-    
-    variables$normed_pcaParameter <- list(
-      "normed_pcaTransform" = input$normed_pcaTransform,
-      "normed_pcaCenter" = input$normed_pcaCenter,
-      "normed_pcaScale" = input$normed_pcaScale,
-      "normed_pcaTopprotein" = input$normed_pcaTopprotein
-    )
+                           scale. = input$normed_pcaScale)
     
     summaryTable <- summary(data.pca.all)$importance
     row.names(summaryTable)[1] <- "Standard Deviation"
@@ -787,19 +736,14 @@ output$normed_pcaSummaryObject <- DT::renderDataTable({
     t <- DT::datatable(summaryTable, options = list(
       dom = "Bt",
       buttons = list(
-        "copy",
-        "print",
         list(
           extend = "collection",
-          buttons = c("csv", "excel", "pdf"),
+          buttons = c("csv", "excel"),
           text = "Download"
         )
       )
     )) %>%
-      formatRound(
-        columns = colnames(summaryTable),
-        digits = 3
-      ) %>%
+      formatRound(columns = colnames(summaryTable), digits = 3) %>%
       formatStyle(
         "Proportion of Variance",
         background = styleColorBar(range(0, 1), "lightblue"),
@@ -830,18 +774,17 @@ output$normed_pcaSummaryObject <- DT::renderDataTable({
 
 # render PCA UI ----
 output$normed_pcaTopproteinPreview <- renderUI({
-  dt <- variables$count.data
+  dt <- variables$normed.count.data
   selected <- input$normed_pcaTopprotein
   dim <- nrow(dt)
-  percent <- selected/dim*100
-  percent <- round(percent,digits = 2)
+  percent <- selected / dim * 100
+  percent <- round(percent, digits = 2)
   
-  tagList(
-    tipify(
-      tags$p(tags$b("Percentage"), ":", percent,"%"),
-      title = "Percentage of total proteins",
-      placement = "left"
-    ))
+  tagList(tipify(
+    tags$p(tags$b("Percentage"), ":", percent, "%"),
+    title = "Percentage of total proteins",
+    placement = "left"
+  ))
   
 })
 output$norm_pcaUI <- renderUI({
@@ -850,7 +793,7 @@ output$norm_pcaUI <- renderUI({
       column(
         3,
         helpText(
-          "PCA is performed on the all proteins (or top n protein) selected by none-zero row variance (or the most variable proteins)."
+          "PCA is performed on the top n varaible proteins without missing values."
         ),
         tipify(
           numericInput(
@@ -860,19 +803,19 @@ output$norm_pcaUI <- renderUI({
             min = -1,
             step = 1
           ),
-          title = "How many of the most variable proteins should be used for calculating the PCA. Use all none-zero row variance protein if none value is supplied.",
+          title = "Number of top varied proteins for calculation",
           placement = "left"
         ),
         uiOutput("normed_pcaTopproteinPreview"),
         tipify(
           materialSwitch(
             inputId = "normed_pcaTransform",
-            label = "Log(x+1) transform",
+            label = "Log2 transform",
             value = TRUE,
             right = TRUE,
             status = "primary"
           ),
-          title = "Whether the raw intensity should be performed log(x+1) transformation before analysis.",
+          title = "Use log2 transformed data or original expression data.",
           placement = "left"
         ),
         tipify(
@@ -883,7 +826,7 @@ output$norm_pcaUI <- renderUI({
             right = TRUE,
             status = "primary"
           ),
-          title = "Whether the value should be shifted to be zero centered.",
+          title = "Whether values should be zero centered.",
           placement = "left"
         ),
         tipify(
@@ -894,7 +837,7 @@ output$norm_pcaUI <- renderUI({
             right = TRUE,
             status = "primary"
           ),
-          title = "Whether the value should be scaled to have unit variance before the analysis.",
+          title = "Whether the value should be scaled.",
           placement = "left"
         ),
         tipify(
@@ -909,34 +852,38 @@ output$norm_pcaUI <- renderUI({
           placement = "left"
         )
       ),
-      column(
-        9,
-        tabsetPanel(
-          tabPanel(title = "2D Plot", plotlyOutput("normed_pcaPlotObject2d") %>% withSpinner()),
-          tabPanel(title = "3D Plot", plotlyOutput("normed_pcaPlotObject3d") %>% withSpinner()),
-          tabPanel(
-            title = "Summary Table",
-            DT::dataTableOutput("normed_pcaSummaryObject") %>% withSpinner()
-          ),
-          tabPanel(
-            title = "Scree Plot",
-            plotlyOutput("normed_pcaPlotObjectScree") %>% withSpinner()
-          )
+      column(9, tabsetPanel(
+        tabPanel(
+          title = "2D Plot",
+          plotlyOutput("normed_pcaPlotObject2d") %>% withSpinner()
+        ),
+        tabPanel(
+          title = "3D Plot",
+          plotlyOutput("normed_pcaPlotObject3d") %>% withSpinner()
+        ),
+        tabPanel(
+          title = "Summary Table",
+          DT::dataTableOutput("normed_pcaSummaryObject") %>% withSpinner()
+        ),
+        tabPanel(
+          title = "Scree Plot",
+          plotlyOutput("normed_pcaPlotObjectScree") %>% withSpinner()
         )
-      )
+      ))
     ))
   } else {
     helpText("No data for ploting. Please import dataset and assign group information first.")
   }
 })
 
-# Dend and heatmap ----
+# sample-sample correlation heatmap ----
 output$normed_dendPlotObject <- renderPlotly({
   if (length(variables$normed.count.data) > 0) {
     data <- variables$normed.count.data
     
     data <- data[apply(data, 1, var) != 0, ]
-    if (!is.na(input$normed_dendTopGene) & input$normed_dendTopGene < nrow(data)) {
+    if (!is.na(input$normed_dendTopGene) &
+        input$normed_dendTopGene < nrow(data)) {
       data <- data[order(apply(data, 1, var), decreasing = TRUE)[1:input$normed_dendTopGene], ]
     }
     
@@ -950,14 +897,9 @@ output$normed_dendPlotObject <- renderPlotly({
       hclust_method = input$normed_dendCluster,
       labRow = rownames(data),
       labCol = colnames(data),
-      colors = GnBu(500)
+      colors = rev(RdBu(100))
     ) %>%
-      config(
-        toImageButtonOptions = list(
-          format = "svg",
-          filename = "Hierarchical_Clustering"
-        )
-      )
+      config(toImageButtonOptions = list(format = "svg", filename = "Sample_Correlation"))
     variables$normed_heatmap <- p
     p
   } else {
@@ -967,18 +909,17 @@ output$normed_dendPlotObject <- renderPlotly({
 
 # Render dend and heatmap UI ----
 output$normed_dendtopProteinPreview <- renderUI({
-  dt <- variables$count.data
+  dt <- variables$normed.count.data
   selected <- input$normed_dendTopGene
   dim <- nrow(dt)
-  percent <- selected/dim*100
-  percent <- round(percent,digits = 2)
+  percent <- selected / dim * 100
+  percent <- round(percent, digits = 2)
   
-  tagList(
-    tipify(
-      tags$p(tags$b("Percentage"), ":", percent,"%"),
-      title = "Percentage of total proteins",
-      placement = "left"
-    ))
+  tagList(tipify(
+    tags$p(tags$b("Percentage"), ":", percent, "%"),
+    title = "Percentage of total proteins",
+    placement = "left"
+  ))
 })
 
 output$norm_dendUI <- renderUI({
@@ -1007,24 +948,21 @@ output$norm_dendUI <- renderUI({
             "Ward.D2" = "ward.D2",
             "Single" = "single",
             "UPGMA (Average)" = "average",
-            "WPGMA (Mcquitty)" = "mcquitty" # ,
-            # "WPGMC (Median)" = "median",
-            # "UPGMC (centroid)" = "centroid"
+            "WPGMA (Mcquitty)" = "mcquitty" 
           )
         ),
         selectInput(
           inputId = "normed_dendCor",
           label = "Distance Measure",
-          choices = c(
-            "Spearman" = "spearman",
-            "Pearson" = "pearson"
-          )
+          choices = c("Spearman" = "spearman", "Pearson" = "pearson")
         )
       ),
-      column(9, plotlyOutput("normed_dendPlotObject") %>% withSpinner())
+      column(
+        9,
+        plotlyOutput("normed_dendPlotObject") %>% withSpinner()
+      )
     ))
   } else {
     helpText("No data for ploting. Please import dataset and assign group information first.")
   }
 })
-

@@ -5,7 +5,7 @@ account: azhang97
 server: svlprshiny01.stjude.org
 hostUrl: http://svlprshiny01.stjude.org/__api__
 appId: 67
-bundleId: 304
+bundleId: 331
 url: http://svlprshiny01.stjude.org/JUMPrshiny/
 version: 1
 asMultiple: FALSE

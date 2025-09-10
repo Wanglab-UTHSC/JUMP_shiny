@@ -1,15 +1,35 @@
 #server-enrichment.R
 
 library(clusterProfiler)
+library(R.utils)
 library(enrichplot)
 library(ggnewscale)
 library(org.Hs.eg.db)
 library(org.Mm.eg.db)
 library(ggplot2)
 library(plotly)
+library(data.table)
+library(DT)
+
+
+options(clusterProfiler.download.method = "wget")
 
 FilterRun <- reactiveValues(FilterRunValue = FALSE)
 enRun <- reactiveValues(enRunValue = FALSE)
+customPW <- reactiveValues(term2gene = NULL, term2name = NULL)
+
+
+.clean_genes <- function(x) {
+  x <- trimws(x); x <- x[nzchar(x)]
+  toupper(x)
+}
+.try_read_maybe_tab_or_csv <- function(p) {
+  dt <- tryCatch(fread(p, sep="\t", header=TRUE, data.table=FALSE), error=function(e) NULL)
+  if (is.null(dt) || ncol(dt) == 1) {
+    dt <- fread(p, sep=",", header=TRUE, data.table=FALSE)
+  }
+  dt
+}
 
 #UI of the first three tabs
 output$enrich_filter <- renderUI({
@@ -22,7 +42,7 @@ output$enrich_filter <- renderUI({
           "List" = "en_list",
           # "By name",
           "FDR" = "en_FDR",
-          "p-val" = "en_top"
+          "P-val" = "en_top"
         ),
         justified = TRUE,
         status = "primary"
@@ -30,14 +50,14 @@ output$enrich_filter <- renderUI({
       uiOutput("enrich_sigLevel"),
       numericInput("en_log2fcUp", 
                    label = "Upregulated Log2-fold cutoff", 
-                   min = -2, 
-                   max = 2, 
+                   min = 0, 
+                   max = 10, 
                    step = 0.1,
                    value = 0.3),
       numericInput("en_log2fcDown", 
                    label = "Downregulated Log2-fold cutoff", 
-                   min = -2, 
-                   max = 2, 
+                   min = -10, 
+                   max = 0, 
                    step = 0.1,
                    value = -0.3)
     )
@@ -57,27 +77,25 @@ output$enrich_sigLevel <- renderUI({
       rows = 5,
       placeholder = "Input protein's name (first column in the dataset), one protein id per line."
     ),
-    "en_FDR" = tagList(
-      tagList(
-        sliderInput(
-          "enrichmentFDR",
-          "FDR Cut-off",
-          min = 0.01,
-          max = 1,
-          value = 0.01
-        ),
-        textOutput("enrichmentProteinPreview")
-      )
+    "en_FDR" = tagList(numericInput(
+      "enrichmentFDR",
+      "FDR Cut-off",
+      min = 0.01,
+      max = 1,
+      value = 0.01,
+      step = 0.01
     ),
-    "en_top" = numericInput(
+    textOutput("enrichmentProteinPreview")),
+    "en_top" = tagList(numericInput(
       inputId = "en_topProt",
       label = "P-value cutoff",
       value = 0.05,
       min = 0,
       max = 1,
       step = 0.01
-    )
-  )
+    ),
+    textOutput("enrichmentProteinPreview")
+  ))
 })
 
 
@@ -89,10 +107,18 @@ observeEvent(input$enrichmentFDR, {
   output$enrichmentProteinPreview <- renderText({
     paste0(
       "Protein number: ",
-      prot_count,
-      " | Generation time: ~",
-      round(prot_count / 30, 2),
-      "s"
+      prot_count
+    )
+  })
+})
+observeEvent(input$en_topProt, {
+  res <- variables$result
+  prot_count <-
+    nrow(res[res$"p-value" <= input$en_topProt, ])
+  output$enrichmentProteinPreview <- renderText({
+    paste0(
+      "Protein number: ",
+      prot_count
     )
   })
 })
@@ -100,20 +126,20 @@ observeEvent(input$enrichmentFDR, {
 
 observeEvent(input$enrich_sigFilter,{
   
-  progressSweetAlert(
-    session = session,
-    id = "filterProgress",
-    title = "Load in parameter",
-    display_pct = TRUE,
-    value = 0
-  )
+  # progressSweetAlert(
+  #   session = session,
+  #   id = "filterProgress",
+  #   title = "Load in parameter",
+  #   display_pct = TRUE,
+  #   value = 0
+  # )
   
-  updateProgressBar(
-    session = session,
-    id = "filterProgress",
-    title = "Processing data",
-    value = 30
-  )
+  # updateProgressBar(
+  #   session = session,
+  #   id = "filterProgress",
+  #   title = "Processing data",
+  #   value = 30
+  # )
   #Obtain filter parameters
   data <- variables$result
   res <- variables$res
@@ -125,14 +151,14 @@ observeEvent(input$enrich_sigFilter,{
       selectList <- row.names(data) %in% unlist(strsplit(x = input$enrichmentTextList, split = "[\r\n]"))
       sampleData <- data[selectList,]
       
-      updateTextAreaInput(session = session, inputId = "enrichmentTextList",value = input$heatmapTextList)
+      #updateTextAreaInput(session = session, inputId = "enrichmentTextList",value = input$heatmapTextList)
     }
     else if(input$enrich_filterSelectType == "en_FDR"){
       selectList <-
         row.names(data) %in% row.names(res[res$FDR <= input$enrichmentFDR, ])
       sampleData <- data[selectList,]
       
-      updateSliderInput(session = session,inputId = "enrichmentFDR",value = input$enrichmentFDR)
+      #updateSliderInput(session = session,inputId = "enrichmentFDR",value = input$enrichmentFDR)
     }
     else if(input$enrich_filterSelectType == "en_top"){
       pvalCut <- input$en_topProt
@@ -140,7 +166,7 @@ observeEvent(input$enrich_sigFilter,{
       #   row.names(data) %in% row.names(res[res$`p-value`<=pvalCut,])
       sampleData <- data[which(data$'p-value' <= pvalCut),]
       
-      updateNumericInput(session = session,inputId = "en_topProt",value = input$en_topProt)
+      #updateNumericInput(session = session,inputId = "en_topProt",value = input$en_topProt)
     }
     else{
       sendSweetAlert(
@@ -152,12 +178,12 @@ observeEvent(input$enrich_sigFilter,{
       return()
     }
     
-    updateProgressBar(
-      session = session,
-      id = "filterProgress",
-      title = "Data Selected",
-      value = 50
-    )
+    # updateProgressBar(
+    #   session = session,
+    #   id = "filterProgress",
+    #   title = "Data Selected",
+    #   value = 50
+    # )
     
     upCut <- input$en_log2fcUp
     downCut <- input$en_log2fcDown
@@ -192,24 +218,24 @@ observeEvent(input$enrich_sigFilter,{
   }
   
   
-  
-  updateProgressBar(
-    session = session,
-    id = "filterProgress",
-    title = "Log2 fold change applied",
-    value = 50
-  )
+  # 
+  # updateProgressBar(
+  #   session = session,
+  #   id = "filterProgress",
+  #   title = "Log2 fold change applied",
+  #   value = 50
+  # )
   
   
   variables$enrichedDataList <- sampleData
   #write.csv(sampleData,"test/filteredResult.csv")
   
-  updateProgressBar(
-    session = session,
-    id = "filterProgress",
-    title = "Output data table",
-    value = 80
-  )
+  # updateProgressBar(
+  #   session = session,
+  #   id = "filterProgress",
+  #   title = "Output data table",
+  #   value = 80
+  # )
   
   output$downLoadFilTable <- downloadHandler(
     filename = "pre_enrichment_filter.csv",
@@ -233,33 +259,10 @@ observeEvent(input$enrich_sigFilter,{
         data,
         filter = "bottom",
         colnames = c("Uniprot ID" = 1),
-        # caption = tags$caption(
-        #   tags$li("Filter proteins by typing condictions (such as 2...5) in the filter boxes to filter numeric columns. ",
-        #           tags$b("Copy"),
-        #           ", ",
-        #           tags$b("Print"),
-        #           " and ",
-        #           tags$b("Download"),
-        #           " the filtered result for further analysis."
-        #   ),
-        #   tags$li(
-        #     HTML("<font color=\"#B22222\"><b>Protein ID</b></font> is colored according to FDR cut-off.")
-        #   )
-        # ),
         selection = 'single',
         extensions = c("Scroller", "Buttons"),
         option = list(
           dom = 'lfrtip',
-          # buttons =
-          #   list(
-          #     'copy',
-          #     'print',
-          #     list(
-          #       extend = 'collection',
-          #       buttons = c('csv', 'excel', 'pdf'),
-          #       text = 'Download'
-          #     )
-          #   ),
           deferRender = TRUE,
           scrollY = 400,
           scrollX = TRUE,
@@ -277,22 +280,22 @@ observeEvent(input$enrich_sigFilter,{
   },server = TRUE)
   
   
-  updateProgressBar(
-    session = session,
-    id = "filterProgress",
-    title = "Data Saved",
-    value = 100
-  )
+  # updateProgressBar(
+  #   session = session,
+  #   id = "filterProgress",
+  #   title = "Data Saved",
+  #   value = 100
+  # )
   
   FilterRun$FilterRunValue <- input$enrich_sigFilter
   
-  closeSweetAlert(session = session)
-  sendSweetAlert(
-    session = session,
-    title = "DONE",
-    text = "Data filtering done.",
-    type = "success"
-  )
+  # closeSweetAlert(session = session)
+  # sendSweetAlert(
+  #   session = session,
+  #   title = "DONE",
+  #   text = "Data filtering done.",
+  #   type = "success"
+  # )
   
 })
 
@@ -302,13 +305,11 @@ output$preEnrichResultTable <- renderUI({
   if(FilterRun$FilterRunValue){
     tagList(fluidRow(column(
       12,
-      downloadButton("downLoadFilTable", "Download Filtered Table (CSV)")
-    )),
-    tags$br(),
-    fluidRow(column(
-      12, 
+      downloadButton("downLoadFilTable", "Download Filtered Table (CSV)"),
+      tags$br(),
       DT::dataTableOutput('preEnrichmentTable') %>% withSpinner()
-    )))} else {
+    ))
+    )} else {
       helpText("Click [Run Significance Filter] to obtain Filtered Table.")
     }
 })
@@ -333,30 +334,135 @@ output$go_enrich_select <- renderUI({
 
 
 #------------Run Enrichment Test---------
+observeEvent(input$useCustomGenes,{
+  data <- variables$result
+  
+  customGenes <- unlist(strsplit(x = input$customGenes, split = "[\r\n]"))
+  
+  variables$customGenes <- customGenes
+  matched <- intersect(customGenes,data$GN)
+  genes_notfound <- setdiff(customGenes,data$GN)
+  sendSweetAlert(
+    session = session,
+    title = "Success!",
+    text = "Custom gene list uploaded.",
+    type = "success"
+  )
+  showNotification("Custom gene list uploaded", type = "message", duration = 10)
+  
+})
 
+
+#Helper funciton to identify the symbols user entered
+# Normalize common ID quirks (version suffixes, isoforms)
+normalize_ids <- function(ids) {
+  ids <- trimws(ids)
+  ids <- gsub("\\.\\d+$", "", ids)   # drop version: ENSG..., NM_... .1
+  ids <- toupper(ids)               # UniProt often uppercase
+  unique(ids[nzchar(ids)])
+}
+key_type <- function(customList) {
+  ids <- customList
+  
+  # Patterns:
+  # Ensembl genes: human(most): ENSG..., mouse: ENSMUSG..., general: ENS[A-Z]{0,3}G\d+
+  is_ensembl <- grepl("^ENS[A-Z]{0,3}G\\d+$", ids)
+  
+  # RefSeq: NM_, NR_, NP_ (curated), XM_, XR_, XP_ (predicted), NC_ (genomic)
+  is_refseq  <- grepl("^(NM|NR|NP|XM|XR|XP|NC)_[0-9]+(\\.[0-9]+)?$", ids)
+  
+  # UniProt accessions:
+  #  Classic 6-char: [OPQ][0-9][A-Z0-9]{3}[0-9]  or  [A-NR-Z][0-9][A-Z0-9]{3}[0-9]
+  #  New style: A0Axxxxx (A0A + 7 alnum), allow -isoform suffixes
+  is_uniprot <- grepl("^([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9][A-Z0-9]{3}[0-9]|A0A[A-Z0-9]{7})(-[0-9]+)?$", ids)
+  
+  # Entrez ID
+  is_entrez  <- grepl("^[0-9]+$", ids)
+  
+  # Compute match rates
+  n <- length(ids)
+  rate <- c(
+    ENSEMBL = sum(is_ensembl)/n,
+    REFSEQ  = sum(is_refseq)/n,
+    UNIPROT = sum(is_uniprot)/n,
+    ENTREZID= sum(is_entrez)/n
+  )
+
+  
+  best <- names(rate)[which.max(rate)]
+  confidence <- max(rate)
+  if (confidence == 0) {
+    best <- "SYMBOL"
+    return(best)
+  } else {
+    return(best = best)
+  }
+}
+
+observeEvent(input$customPathwayFile, {
+  #req(input$customPathwayFile)
+  path <- input$customPathwayFile$datapath
+  fmt  <- input$pathwayFileFormat %||% "std"
+  
+  term2gene <- NULL; term2name <- NULL
+  
+  if (fmt == "std") {
+    dt <- .try_read_maybe_tab_or_csv(path)
+    shiny::validate(need(!is.null(dt), "Could not read file."))
+    shiny::validate(need(all(c("Pathway","Description","Gene") %in% colnames(dt)),
+                  "Standard format needs columns: Pathway, Description, Gene."))
+    dt$Gene <- .clean_genes(dt$Gene)
+    term2gene <- unique(dt[, c("Pathway","Gene")]); colnames(term2gene) <- c("TERM","GENE")
+    term2name <- unique(dt[, c("Pathway","Description")]); colnames(term2name) <- c("TERM","NAME")
+    
+  } else if (fmt == "two_column") {
+    dt <- .try_read_maybe_tab_or_csv(path)
+    shiny::validate(need(!is.null(dt), "Could not read file."))
+    if (!all(c("Pathway","Gene") %in% colnames(dt)) && ncol(dt) >= 2) {
+      colnames(dt)[1:2] <- c("Pathway","Gene")
+    }
+    shiny::validate(need(all(c("Pathway","Gene") %in% colnames(dt)),
+                  "Two-column format needs columns: Pathway, Gene."))
+    dt$Gene <- .clean_genes(dt$Gene)
+    term2gene <- unique(dt[, c("Pathway","Gene")]); colnames(term2gene) <- c("TERM","GENE")
+    
+  } else if (fmt == "multi_column") {
+    dt <- .try_read_maybe_tab_or_csv(path)
+    colnames(dt)[1] <- "Pathway"
+    long <- data.frame(Pathway = rep(dt$Pathway, ncol(dt)-1),
+                       Gene = as.vector(as.matrix(dt[, -1, drop=FALSE])),
+                       stringsAsFactors = FALSE)
+    long$Gene <- .clean_genes(long$Gene)
+    term2gene <- unique(subset(long, nzchar(Gene))[, c("Pathway","Gene")])
+    colnames(term2gene) <- c("TERM","GENE")
+  }
+  
+  #shiny::validate(need(!is.null(term2gene) && nrow(term2gene) > 0, "No valid TERM–GENE pairs found."))
+  
+  term2gene <- subset(unique(term2gene), nzchar(TERM) & nzchar(GENE))
+  customPW$term2gene <- term2gene
+  customPW$term2name <- term2name
+  
+  # Quiet success ping (no details leaked)
+  updateSelectInput(session, "method", selected = "custom_enrich")
+  showNotification("Switched enrcihment method to 'Custom Annotation(uploaded)'.",
+                   type = "message", duration = 4)
+  showNotification("Custom pathways loaded.", type = "message", duration = 4)
+})
 observeEvent(input$runEnrichmentAnalysis,{
-  
-  progressSweetAlert(
-    session = session,
-    id = "enrichmentProgress",
-    title = "Loading parameter",
-    display_pct = TRUE,
-    value = 0
-  )
-  
-  updateProgressBar(
-    session = session,
-    id = "enrichmentProgress",
-    title = "Loading data",
-    value = 30
-  )
   
   #Load Data
   data <- variables$enrichedDataList
-  wholeData <- variables$result
-  gene <- row.names(data)
-  geneLst <- row.names(wholeData)
-  
+  wholeData <- variables$CountData
+  geneLst <- wholeData$GN
+  if(length(variables$customGenes)!=0){
+    gene <- variables$customGenes
+    key = key_type(gene)
+    
+  }else{
+    gene <- data$GN
+    key = key_type(gene)
+  }
   #method selection
   method <- input$method
   
@@ -368,40 +474,21 @@ observeEvent(input$runEnrichmentAnalysis,{
   
   
   #Obtain whether key is ENSEMBL, GN, or PID
-  key = "UNIPROT"
+  
   pval = input$enrich_pvalCut
   qval = input$enrich_qvalCut
   minGSSize <- input$minGSSize
   maxGSSize <- input$maxGSSize
   
-  updateProgressBar(
-    session = session,
-    id = "enrichmentProgress",
-    title = "Convert keytypes",
-    value = 50
-  )
+  # updateProgressBar(
+  #   session = session,
+  #   id = "enrichmentProgress",
+  #   title = "Convert keytypes",
+  #   value = 50
+  # )
   
   #translate to symbols
-  tryCatch(
-    {
-      gene_go <- bitr(gene, fromType=key, toType="SYMBOL", OrgDb=org)
-      gene_go <- gene_go$SYMBOL
-      gene_go <- gene_go[!duplicated(gene_go)]
-      geneLst_go <- bitr(geneLst, fromType=key, toType="SYMBOL", OrgDb=org)
-      geneLst_go <- geneLst_go$SYMBOL
-      geneLst_go <- geneLst_go[!duplicated(geneLst_go)]
-    },
-    error = function(e){
-      #closeSweetAlert(session = session)
-      sendSweetAlert(
-        session = session,
-        title = "Enrichment Analysis failed",
-        text = "Convert keytype failed. Please check your selected organism.",
-        type = "error"
-      )
-      return()
-    }
-  )
+  
 
   
   
@@ -415,40 +502,37 @@ observeEvent(input$runEnrichmentAnalysis,{
     kegg_org = "rno"
   }
   
-  updateProgressBar(
-    session = session,
-    id = "enrichmentProgress",
-    title = "Perform Enrichment Analysis",
-    value = 70
-  )
+  gene_go <- gene[!duplicated(gene)]
+  geneLst_go <- geneLst[!duplicated(geneLst)]
   
+  showNotification("Enrichment analysis starting...", type = "message",duration = 50)
   if(method == "go_enrich"){
-    tryCatch({
-      ego <- enrichGO(gene = gene_go,
-                      universe = geneLst_go,
-                      OrgDb         = org,
-                      keyType       = 'SYMBOL',
-                      ont           = ont,
-                      pvalueCutoff  = pval,
-                      qvalueCutoff  = qval,
-                      readable = TRUE)
-      variables$en_result <- ego
-    },
-      error = function(e) {
-        sendSweetAlert(
-          session = session,
-          title = "Enrichment Analysis failed. ",
-          text = "Please check your parameters.",
-          type = "error"
-        )
-        return()
-        })
+    ego <- try(
+      enrichGO(gene          = gene_go,
+               universe      = geneLst_go,
+               OrgDb         = org,
+               keyType       = key,
+               ont           = ont,
+               pvalueCutoff  = pval,
+               qvalueCutoff  = qval,
+               minGSSize     = minGSSize,
+               maxGSSize     = maxGSSize,
+               readable      = TRUE),
+      silent = TRUE
+    )
+
+    if (inherits(ego, "try-error")) {
+      sendSweetAlert(session, "Enrichment failed", "GO enrichment error. Please check organism/parameters.", type = "error")
+      return()
+    }
+    variables$en_result <- ego
   }
   else if(method == "gsea_enrich"){
     geneList <- data$Log2Fold
     name <- row.names(data)
     geneList2 <- as.data.frame(cbind(name,geneList))
-    name <- bitr(name, fromType=key, toType="ENTREZID", OrgDb=org)
+    if(key != "ENTREZID") name <- bitr(name, fromType=key, toType="ENTREZID", OrgDb=org)
+    
     geneList2 <- geneList2[geneList2$name %in% name$UNIPROT,]
     geneList <- as.numeric(geneList2$geneList)
     
@@ -468,7 +552,9 @@ observeEvent(input$runEnrichmentAnalysis,{
     
   }
   else if(method == "kegg_enrich"){
-    gene_kegg <- bitr(gene, fromType=key, toType="ENTREZID", OrgDb=org)
+    if(key != "ENTREZID"){
+      gene_kegg <- bitr(gene, fromType=key, toType="ENTREZID", OrgDb=org)
+    }
     
     
     ego <- enrichKEGG(gene  = gene_kegg$ENTREZID,
@@ -480,6 +566,32 @@ observeEvent(input$runEnrichmentAnalysis,{
     ego_readable <- setReadable(ego,OrgDb = org,keyType = "ENTREZID")
     
     variables$en_result <- ego_readable
+  }
+  else if (method == "custom_enrich"){
+    term2gene <- customPW$term2gene
+    shiny::validate(need(!is.null(term2gene) && nrow(term2gene) > 0,
+                  "Please upload a custom pathway database first."))
+    
+    # Intersect user genes to uploaded gene universe (IDs must match as text)
+    gene_use <- intersect(.clean_genes(gene), unique(term2gene$GENE))
+    shiny::validate(need(length(gene_use) > 0,
+                  "None of your genes matched the uploaded pathways. Check ID types/case."))
+    
+    # Optional background universe from your dataset (keeps p-values conservative)
+    bg <- intersect(.clean_genes(variables$CountData$GN), unique(term2gene$GENE))
+    if (length(bg) < length(gene_use)) bg <- unique(term2gene$GENE)  # fallback to all uploaded genes
+    
+    ego <- enricher(
+      gene         = gene_go,
+      TERM2GENE    = term2gene,
+      TERM2NAME    = customPW$term2name,   # can be NULL
+      pvalueCutoff = pval,
+      qvalueCutoff = qval,
+      minGSSize    = minGSSize,
+      maxGSSize    = maxGSSize,
+      universe     = bg
+    )
+    variables$en_result <- ego
   }
   else{
     geneList <- data$Log2Fold
@@ -504,12 +616,12 @@ observeEvent(input$runEnrichmentAnalysis,{
   }
   
   
-  updateProgressBar(
-    session = session,
-    id = "enrichmentProgress",
-    title = "Output Result",
-    value = 90
-  )
+  # updateProgressBar(
+  #   session = session,
+  #   id = "enrichmentProgress",
+  #   title = "Output Result",
+  #   value = 90
+  # )
   
   shinyCatch(
     variables$en_table <- variables$en_result@result,
@@ -519,91 +631,58 @@ observeEvent(input$runEnrichmentAnalysis,{
   output$downloadEnResultTable <- downloadHandler(
     filename = "enrichment_result.csv",
     content = function(file) {
-      write.csv(variables$en_table, file)
+      write.csv(variables$en_table,file)
     }
   )
   
-  output$afterEnrichResultTable <- DT::renderDataTable({
-    if (nrow(variables$en_result) == 0) {
-      DT::datatable(variables$en_result@result)
-    }else{
-      data <- variables$en_result
-      data <- data@result
-      data$`pvalue` = formatC(data$`pvalue`, format = "e", digits = 3)
-      data$`qvalue` = formatC(data$`qvalue`, format = "e", digits = 3)
-      data$`p.adjust` = formatC(data$`p.adjust`, format = "e", digits = 3)
-      DT::datatable(
-        data = data,
-        filter = "bottom",        
-        # caption = tags$caption(
-        #   tags$li("Filter conditions in the bottom. ",
-        #           tags$b("Copy"),
-        #           ", ",
-        #           tags$b("Print"),
-        #           " and ",
-        #           tags$b("Download"),
-        #           " the enrichment result for further analysis."
-        #   )
-        # ),
-        selection = 'single',
-        extensions = c("Scroller", "Buttons"),
-        option = list(
-          dom = 'lfrtip',
-          # buttons =
-          #   list(
-          #     'copy',
-          #     'print',
-          #     list(
-          #       extend = 'collection',
-          #       buttons = c('csv', 'excel', 'pdf'),
-          #       text = 'Download'
-          #     )
-          #   ),
-          deferRender = TRUE,
-          scrollY = 400,
-          scrollX = TRUE,
-          scroller = TRUE,
-          
-          pageLength = 5,
-          searchHighlight = TRUE,
-          orderClasses = TRUE,
-          columnDefs = list(
-            list(visible = TRUE, targets = -1)
-          )
-        )
-      )
-    }
+  table <- variables$en_table
+  #table <- fortify(ego,showCategory = length(ego@result$ID))
+  output$afterEnrichResultTable <- DT::renderDataTable({ 
+    data <- table
+    data$`pvalue` = formatC(data$`pvalue`, format = "e", digits = 3)
+    data$`qvalue` = formatC(data$`qvalue`, format = "e", digits = 3)
+    data$`p.adjust` = formatC(data$`p.adjust`, format = "e", digits = 3)
+    DT::datatable(data, 
+                  options = list( 
+                    dom = 'lfrtip', 
+                    scrollX = TRUE,
+                    scrollY = 400,
+                    scroller = TRUE,
+                    pageLength = 5, 
+                    searchHighlight = TRUE, 
+                    autoWidth = TRUE 
+                  ), 
+                  rownames = FALSE 
+    ) 
   },server = TRUE)
   
-  enRun$enRunValue <- input$runEnrichmentAnalysis
+  enRun$enRunValue <- TRUE
   
-  updateProgressBar(
-    session = session,
-    id = "enrichmentProgress",
-    title = "Output Result",
-    value = 100
-  )
-  
-  closeSweetAlert(session = session)
-  sendSweetAlert(
-    session = session,
-    title = "DONE",
-    text = "Enrichment analysis done.",
-    type = "success"
-  )
+  # updateProgressBar(
+  #   session = session,
+  #   id = "enrichmentProgress",
+  #   title = "Output Result",
+  #   value = 100
+  # )
+  # 
+  # closeSweetAlert(session = session)
+  # sendSweetAlert(
+  #   session = session,
+  #   title = "DONE",
+  #   text = "Enrichment analysis done.",
+  #   type = "success"
+  # )
   
 })
+
 
 
 output$afterEnrichResultUI <- renderUI({
   if(enRun$enRunValue){
     tagList(fluidRow(column(
       12,
-      downloadButton("downloadEnResultTable", "Download Enrichment Result Table (CSV)")
-    )),
-    tags$br(),
-    fluidRow(column(
-      12, 
+      downloadButton("downloadEnResultTable", "Download Enrichment Result Table (CSV)"),
+      tags$br(),
       DT::dataTableOutput('afterEnrichResultTable') %>% withSpinner()
     )))
   }else{
@@ -616,8 +695,8 @@ output$afterEnrichResultUI <- renderUI({
 #Bubble Plot
 
 output$bubbleplotObject <- renderPlot({
-  validate(
-    need(nrow(variables$en_result)!=0, message = "No enriched term found")
+  shiny::validate(
+    shiny::need(nrow(variables$en_result)!=0, message = "No enriched term found")
   )
   data <- variables$en_result
   p <- dotplot(data,showCategory = 20)+ggtitle("Dot plot")
@@ -630,7 +709,7 @@ output$EN_dotPlot <- renderUI({
   if(enRun$enRunValue){
     fluidRow(column(
       12,
-      plotOutput("bubbleplotObject")%>% withSpinner()
+      plotOutput("bubbleplotObject",height = 800)%>% withSpinner()
     ))
   }else if(enRun$enRunValue && nrow(variables$en_result) == 0){
     helpText("No enriched term found.")
@@ -642,8 +721,8 @@ output$EN_dotPlot <- renderUI({
 
 
 output$enrichmentMap <- renderPlot({
-  validate(
-    need(nrow(variables$en_result)!=0, message = "No enriched term found")
+  shiny::validate(
+    shiny::need(nrow(variables$en_result)!=0, message = "No enriched term found")
   )
   data <- variables$en_result
   x <- pairwise_termsim(data)
@@ -657,7 +736,7 @@ output$EN_network <- renderUI({
   if(enRun$enRunValue){
     fluidRow(column(
       12,
-      plotOutput("enrichmentMap")%>% withSpinner()
+      plotOutput("enrichmentMap",height = 800)%>% withSpinner()
     ))
   }else if(enRun$enRunValue && nrow(variables$en_result) == 0){
     helpText("No enriched term found.")

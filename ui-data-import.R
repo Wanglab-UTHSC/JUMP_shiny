@@ -4,12 +4,12 @@ fluidPage(
   includeCSS("www/style/theme.css"),
   fluidRow(column(
   3,
-  tabBox(
-    title = "",
-    id = "datasource",
-    width = NULL,
-    tabPanel(
-      tagList(icon("cloud-upload"), "Upload"),
+  #tabBox(
+  box(
+      title = tagList(icon("cloud-upload"), "Upload"),
+      solidHeader = TRUE,
+      status = "primary",
+      width = NULL,
       radioButtons(
         "dataType",
         "Choose your file type",
@@ -17,40 +17,37 @@ fluidPage(
                     "jumpq",
                     "jump_batch")
       ),
+      radioButtons(
+        "intensityType",
+        "Type of intensity values",
+        choices = c("raw", "log2"), 
+        inline = T
+      ),
       fileInput(
-        "uploadCountData",
-        "Upload Raw Data",
+        "uploadExpressionData",
+        "Upload Data",
         accept = c("text/csv",
                    "text/comma-separated-values,text/plain",
                    ".csv"),
         buttonLabel = "Upload...",
         placeholder = "No file has been uploaded."
       ),
-      helpText("Text file in .tsv/.csv format, and the first column should be Accession Number, second column should be Gene Names, Third should be Description.")
-    ),
-    tabPanel(
-      tagList(icon("folder-open"), "Example"),
-      uiOutput("dataSourceSelect"),
-      tags$p("Example JUMP raw data for illustration, containing 11 signals."),
-      
-      do.call(actionBttn, c(
-        list(
-          inputId = "CountDataSample",
-          label = "1. Import Data",
-          icon = icon("play")
-        ),
-        actionBttnParams
-      ))
-    )
+      helpText("Text file in .tsv/.csv format, and the first column should be Accession Number, second column should be Gene Names, Third should be Description."),
+      a(href = "data/example_data.zip",
+        "Download example input expression table",
+        download = NA,
+        target = "_blank"
+      )
+
   ),
   box(
-    title = tagList(icon("tags"), "Group Assignment"),
+    title = tagList(icon("tags"), "Meta information"),
     solidHeader = TRUE,
     status = "primary",
     width = NULL,
     fileInput(
       "uploadGroup",
-      "Upload Group Information",
+      "Upload sample information",
       accept = c("text/csv",
                  "text/comma-separated-values,text/plain",
                  ".csv"),
@@ -58,25 +55,31 @@ fluidPage(
       placeholder = "No file has been uploaded."
     ),
     helpText("Text file in .tsv/.csv format, and the first column should be named as Sample."),
+    # a(href = "data/meta_DIA.csv",
+      # "Download example sample information table",
+      # download = NA,
+      # target = "_blank"
+    # ),
+    tags$br(),
     do.call(actionBttn, c(
       list(
         inputId = "confirmedGroupList",
-        label = "2. Assign Group Label",
+        label = "Assign group information",
         icon = icon("play")),
       actionBttnParams
       )
     ),
-    footer = helpText("JUMP Suite expect first label should be Group1 (G1) and the next be Group2 (G2), and so on.")
+    footer = helpText("JUMP Shiny expect first column to be sample name, second column to be group information, and so on.")
   ),
   box(
-    title = tagList(icon("layer-group"), "Group Selection"),
+    title = tagList(icon("layer-group"), "Group selection"),
     solidHeader = TRUE,
     status = "primary",
     width = NULL,
     uiOutput("groupSelection")
   ),
   box(
-    title = tagList(icon("info-circle"), "Summary"),
+    title = tagList(icon("info-circle"), "Data info"),
     solidHeader = TRUE,
     status = "info",
     width = NULL,
@@ -86,7 +89,7 @@ fluidPage(
 column(
   9,
   box(
-    title = tagList(icon("table"), "Protein Expression Table"),
+    title = tagList(icon("table"), "Protein expression table"),
     solidHeader = TRUE,
     status = "primary",
     width = NULL,
@@ -107,11 +110,11 @@ column(
       title = tagList(icon("area-chart"), "Density Plot"),
       uiOutput("sampleDistributionDensityPanel")
     ),
-    tabPanel(title = tagList(icon("object-group"), "MDS Plot"),
-             uiOutput("mdsUI")),
+    # tabPanel(title = tagList(icon("object-group"), "QQ plot"),
+    #          uiOutput("QQplot")),
     tabPanel(title = tagList(icon("object-group"), "PCA"),
              uiOutput("pcaUI")),
-    tabPanel(title = tagList(icon("sitemap"), "Hierarchical Clustering"),
+    tabPanel(title = tagList(icon("sitemap"), "Sample Correlation"),
              uiOutput("dendUI"))
   )
 )))

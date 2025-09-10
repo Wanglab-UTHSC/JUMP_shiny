@@ -4,40 +4,10 @@ options(shiny.maxRequestSize = 60*1024^2)
 
 dataImportCheck <- reactiveValues(importRunValue = FALSE)
 
-output$dataSourceSelect <- renderUI({
-  selectInput(
-    "SampleDatabase",
-    "Select Sample Data",
-    choices = c(
-      "JUMP sample" = "sample_data/combined_norm_uni_test_example.txt"
-    )
-  )
-})
-
-# If Sample Data button has been clicked, load sample data. ----
-
-observeEvent(input$CountDataSample, {
-  dataImportCheck$importRunValue <- FALSE
-
-  if (input$SampleDatabase == "sample_data/combined_norm_uni_test_example.txt") {
-    # data(hypoData)
-    variables$CountData <- data.frame(fread(input$SampleDatabase), row.names = 1)
-  } else {
-    variables$CountData <- data.frame(variables$simulationData$count)
-  }
-  
-  sendSweetAlert(
-    session = session,
-    title = "DONE",
-    text = "Count data were successfully loaded.",
-    type = "success"
-  )
-  
-})
-
 
 # If Upload Data button has been clicked, load the data via upload ----
 
+#validate if there are any duplicated uniprot ids
 dupValidate <- function(input){
   rownum <- nrow(input[duplicated(input$pid),])
   if (rownum > 0) {
@@ -53,17 +23,17 @@ dupValidate <- function(input){
   }
 }
 
-observeEvent(input$uploadCountData, {
-  showNotification("Start uploading file...", type = "message")
+observeEvent(input$uploadExpressionData, {
+  showNotification("Uploading file...", type = "message")
   
   shinyCatch(
     {
       #read in uploaded data
       rawdata <-
-        data.frame(fread(input$uploadCountData$datapath))
+        data.frame(fread(input$uploadExpressionData$datapath))
       
       #omit NA values
-      nNA <- sum(is.na(rawdata))
+      nNA <- sum(rowSums(is.na(rawdata))>0)
       variables$nNA <- nNA
       #rawdata<- na.omit(rawdata)
       
@@ -98,7 +68,7 @@ observeEvent(input$uploadCountData, {
           }
           
         }
-        first <- batchidx[-1]+5
+        first <- batchidx[length(batchidx)]+5
         last <- ncol(rawdata)
         colnum <- c(colnum, first:last)
         rawdata <- rawdata[,colnum]
@@ -109,55 +79,57 @@ observeEvent(input$uploadCountData, {
       }
     }
   )   
-      
-      
-      #Sort raw data based on summation of signals
-      # rawdata$sum <- rowSums(rawdata[,c(4:ncol(rawdata))])
-      # rawdata <- rawdata[order(rawdata$sum,decreasing = T),]
-      # 
-      # 
-      # rawdata<- rawdata[,-ncol(rawdata)]
-      new <- rawdata
-      
-      
-      tryCatch({
-        #make the first column as row name
-        rn <- rawdata$'pid'
-        
-        #check if the accession number is already obtained
-        if(sum(grepl('\\|', rn))){
-          rawdata2 <- rawdata %>% separate("pid", into = c("id1", "pid","id2"), sep = "\\|")
-          pid = rawdata2$pid
-          new <- data.frame(pid, rawdata)
-          new <- new[-2]
-        }
-      },
-      error = function(e){
-        sendSweetAlert(
-          session = session,
-          title = "Accession number or protein id error. Check your first column.",
-          text = as.character(message(e)),
-          type = "error"
-        )
-        return()
-      })
-      
-      
-      #Get unique row names
-      validate(dupValidate(new))
-      new <- new[!duplicated(new$pid),]
-      variables$dup <- nrow(new[duplicated(new$pid),])
-      row.names(new) <- new$pid
-      new <- new[,-1]
-      
-      
-      #save the raw data as a global variable
-      variables$CountData <- new
-
-      dataImportCheck$importRunValue <- FALSE
-
-      showNotification("Received uploaded file.", type = "message")
-
+  
+  
+  
+  new <- rawdata
+  
+  
+  tryCatch({
+    #make the first column as row name
+    rn <- rawdata$'pid'
+    
+    #check if the accession number is already obtained
+    if(sum(grepl('\\|', rn))){
+      rawdata2 <- rawdata %>% separate("pid", into = c("id1", "pid","id2"), sep = "\\|")
+      pid = rawdata2$pid
+      new <- data.frame(pid, rawdata)
+      new <- new[-2]
+    }
+  },
+  error = function(e){
+    sendSweetAlert(
+      session = session,
+      title = "Accession number or protein id error. Check your first column.",
+      text = as.character(message(e)),
+      type = "error"
+    )
+    return()
+  })
+  
+  
+  #Get unique row names
+  #validate(dupValidate(new))
+  new <- new[!duplicated(new$pid),]
+  variables$dup <- nrow(new[duplicated(new$pid),])
+  row.names(new) <- new$pid
+  new <- new[,-1]
+  
+  
+  #save the raw data as a global variable
+  if(input$intensityType  == "log2"){
+    data <- new[,3:ncol(new)]
+    data_trans <- 2^data
+    temp <- cbind(new[,1:2], data_trans)
+    new <- temp
+  }
+  
+  variables$CountData <- new
+  
+  dataImportCheck$importRunValue <- FALSE
+  
+  showNotification("Data uploaded successfully.", type = "message")
+  
 })
 
 datasetInput <- reactive({
@@ -173,15 +145,10 @@ output$table <- DT::renderDataTable({
   temp <- round(temp,digits = 0)
   df <- cbind(variables$CountData[,c(1,2)],temp)
   
-  # brks <-
-  #   quantile(df %>% select_if(is.numeric),
-  #            probs = seq(.05, .95, .05),
-  #            na.rm = TRUE
-  #   )
   
   DT::datatable(
     df,
-    colnames = c("Accesion Number" = 1),
+    colnames = c("Accession Number" = 1),
     extensions = c("Scroller","RowReorder"),
     option = list(
       rowReorder = TRUE,
@@ -201,12 +168,88 @@ output$table <- DT::renderDataTable({
 # Render DataTable of row data count ----
 
 output$emptyTable <- renderUI({
-  if (nrow(datasetInput()) == 0) {
-    tags$p("No data to show. Click", tags$code("Sample"), "or", tags$code("Upload"), "your own dataset.")
+  if (nrow(variables$CountData) == 0) {
+    tags$p("No data to show. Download", tags$code("Example"), "or", tags$code("Upload"), "your own dataset.")
   } else {
-    DT::dataTableOutput("table")
+    tagList(
+      fluidRow(
+        column(
+          12,
+          DT::dataTableOutput("table"),
+          plotlyOutput('raw_boxplot')%>% withSpinner()
+        )
+      )
+    )
+    
   }
 })
+
+output$raw_boxplot <- renderPlotly({
+  req(nrow(variables$CountData) > 0)     # require expression data
+  req(input$table_rows_selected)         # require a row click
+  
+  # Expression data (skip first 2 meta columns)
+  data <- variables$CountData[, 3:ncol(variables$CountData)]
+  
+  # Row index when clicking the row
+  rowInd <- input$table_rows_selected
+  expr <- as.numeric(data[rowInd, ])
+  
+  # --- Group mapping logic ---
+  if (is.null(variables$group) || is.null(input$groups1)) {
+    # No group info uploaded yet → default group
+    data.cl <- rep("Samples", ncol(data))
+  } else {
+    # Use uploaded group info
+    data.cl <- variables$groupListConvert
+    data.cl <- data.cl[data.cl!=0]
+    if (all(data.cl == 0)) {
+      data.cl <- rep("Unassigned", ncol(data))
+    }
+  }
+  
+  # Build plotting dataframe
+  #group_levels <- unique(names(variables$groupList))
+  df <- data.frame(
+    samples   = colnames(data),
+    intensity = round(log2(expr), digits = 2),
+    group     = factor(data.cl, levels = unique(data.cl))
+  )
+  
+  # Order x-axis by group
+  xOrderVector <- unique(df$samples[order(df$group)])
+  xform <- list(
+    categoryorder = "array",
+    categoryarray = xOrderVector,
+    title = ""
+  )
+  
+  # Plot barplot
+  plot_ly(
+    data = df,
+    x = ~samples,
+    y = ~intensity,
+    color = ~group,          # color by group (or "All Samples")
+    text = ~intensity,
+    type = "bar",
+    showlegend = TRUE
+  ) %>%
+    layout(
+      xaxis = xform,
+      yaxis = list(
+        title = "Intensity distribution of original data",
+        range = c(0.9 * min(df$intensity), max(df$intensity) + 0.5)
+      ),
+      title = rownames(data)[rowInd]
+    ) %>%
+    plotly::config(
+      toImageButtonOptions = list(
+        format = "svg",
+        filename = rownames(data)[rowInd]
+      )
+    )
+})
+
 
 observeEvent(input$confirmedGroupList, {
   if (nrow(datasetInput()) == 0) {
@@ -237,15 +280,16 @@ observeEvent(input$confirmedGroupList, {
         display_pct = TRUE,
         value = 0
       )
-      showNotification("Start uploading file...", type = "message")
+      showNotification("Uploading file...", type = "message")
       
       
       group <- data.frame(fread(input$uploadGroup$datapath, header = T, blank.lines.skip = T))
       group_no_header <- data.frame(fread(input$uploadGroup$datapath,header = FALSE))
       
-      showNotification("Received uploaded file.", type = "message")
+      showNotification("Data uploaded successfully.", type = "message")
       
       #store group information
+      colnames(group)[1] <- "sample"
       variables$group <- group
       
       
@@ -254,31 +298,26 @@ observeEvent(input$confirmedGroupList, {
       groupName <- colnames(group)
       
       
+      # Create groupList
+      variables$groupList <- split(group_no_header$V1, group_no_header$V2)
       
-      variables$groupList <-
-        lapply(unique(group_no_header$V2), function(x) {
-          group_no_header[group_no_header$V2 == x, ]$V1
-        })
-      names(variables$groupList) <- unique(group_no_header$V2)
-      
+      # Match the groups in group info to expression data samples
       data.cl <- rep(0, ncol(variables$CountData))
-      
-      for (i in 1:length(variables$groupList)) {
-        data.cl[unlist(lapply(variables$groupList[[i]], convert2cl, df = variables$CountData))] <- names(variables$groupList[i])
+      for (i in seq_along(variables$groupList)) {
+        indices <- match(variables$groupList[[i]], colnames(variables$CountData))
+        data.cl[indices] <- names(variables$groupList)[i]
       }
+      
+      
       
       # Storage convert group list to local
       variables$groupListConvert <- data.cl
       
       #store numeric data
-      variables$count.data <- variables$CountData[data.cl != 0]
-      variables$count.data <- as.matrix(variables$count.data)
+      variables$count.data <- as.matrix(variables$CountData[, data.cl != 0])
       
-      #check whether sample info mathes raw data
-      colnum <- ncol(variables$count.data)
-      sample_nrow <- nrow(group)
-      
-      if(colnum != sample_nrow){
+      # Check if sample info matches raw data
+      if (ncol(variables$count.data) != nrow(group)) {
         sendSweetAlert(
           session = session,
           title = "Warning",
@@ -288,10 +327,8 @@ observeEvent(input$confirmedGroupList, {
         return()
       }
       
-      #store converted group info
-      group2 <- data.cl[data.cl != 0]
-      group2 <- data.frame(group = group2)
-      group2 <- data.frame(lapply(group2, as.factor))
+      # Store converted group info
+      group2 <- data.frame(group = factor(data.cl[data.cl != 0]))
       rownames(group2) <- colnames(variables$count.data)
       variables$group_import <- group2
       
@@ -311,7 +348,7 @@ observeEvent(input$confirmedGroupList, {
         } else {
           vars = colnames(df)[2: ncol(df)]    
         }
-
+        
         selectInput("groups1", "Grouping variable",
                     choices = vars, selected = vars[1])
       })
@@ -351,46 +388,40 @@ observeEvent(input$confirmedGroupList, {
 
 # 
 observeEvent(input$groups1,{
-  #import the whole group selection
+  # Import the group selection
   groupList <- as.data.frame(variables$group)
   group <- input$groups1
-
-  idx <- as.numeric(grep(group, colnames(groupList)))
   
-  if(colnames(groupList)[1] == "Sample"){
-    colnames(groupList)[1] <- tolower(colnames(groupList)[1])
-  }
-
-  #get the new group
-  variables$groupList <-
-    lapply(unique(groupList[,idx]), function(x) {
-      groupList[which(groupList[,idx] == x), ]$sample
-    })
+  # Find the column index for the selected group
+  idx <- grep(group, colnames(groupList))
   
-  names(variables$groupList) <- unique(groupList[,idx])
+  # Unify sample column name
+  colnames(groupList)[1] <- "sample"
   
+  # Create the second group list based on the selected group column
+  variables$groupList <- split(groupList$sample, groupList[, idx])
+  
+  # Match samples in the group with sample in the data
   data.cl <- rep(0, ncol(variables$CountData))
-  
-  for (i in 1:length(variables$groupList)) {
-    data.cl[unlist(lapply(variables$groupList[[i]], convert2cl, df = variables$CountData))] <- names(variables$groupList[i])
+  for (i in seq_along(variables$groupList)) {
+    indices <- match(variables$groupList[[i]], colnames(variables$CountData))
+    data.cl[indices] <- names(variables$groupList)[i]
   }
   
-  # Storage convert group list to local
+  # Update converted group list
   variables$groupListConvert <- data.cl
   
-
-  variables$count.data <- variables$CountData[data.cl != 0]
-  variables$count.data <- as.matrix(variables$count.data)
+  # store only numeric data
+  variables$count.data <- as.matrix(variables$CountData[, data.cl != 0])
   
-  #store converted group info
-  group2 <- data.cl[data.cl != 0]
-  group2 <- data.frame(group = group2)
-  group2 <- data.frame(lapply(group2, as.factor))
+  # Update group info to selected column
+  group2 <- data.frame(group = factor(data.cl[data.cl != 0]))
   rownames(group2) <- colnames(variables$count.data)
   variables$group_import <- group2
-
-
+  
 })
+
+#add box plot
 
 output$importDataSummary <- renderUI({
   dt <- datasetInput()
@@ -400,7 +431,7 @@ output$importDataSummary <- renderUI({
   groupCount <- length(variables$groupList)
   groupText <- sapply(variables$groupList, length)
   if (length(groupText) > 0) {
-    gText <- paste0(names(groupText), ": ", groupText, collapse = "\n")
+    gText <- paste0(names(groupText), ": ", groupText, collapse = "<br>")
   } else {
     gText <- NULL
   }
@@ -413,17 +444,17 @@ output$importDataSummary <- renderUI({
   
   tagList(
     tipify(
-      tags$p(tags$b("N", tags$sub("Protein")), ":", rowCount),
-      title = "Number of Proteins",
+      tags$p(tags$b("N", tags$sub("Protein/Peptide")), ":", rowCount),
+      title = "Number of proteins/peptides",
       placement = "left"
     ),
     tipify(
-      tags$p(tags$b("N", tags$sub("group")), ": ", groupCount),
-      title = "Number of Groups",
+      tags$p(tags$b("N", tags$sub("group")),": ", groupCount),
+      title = "Number of groups",
       placement = "left",
     ),
     tipify(
-      tags$p(tags$b("N", tags$sub("samples in group")), ": ", gText),
+      tags$p(tags$b("N", tags$sub("samples in group")), HTML(": <br>"), HTML(gText)),
       title = "Number of samples in each group",
       placement = "left"
     ),
@@ -433,8 +464,8 @@ output$importDataSummary <- renderUI({
       placement = "left"
     ),
     tipify(
-      tags$p(tags$b("N", tags$sub("NAs")), ": ", nNA),
-      title = "Number of NAs omitted",
+      tags$p(tags$b("Nrow",tags$sub("NA")), ": ", nNA),
+      title = "Rows of proteins/petides that contain at least 1 NA",
       placement = "left"
     )
   )
@@ -446,9 +477,9 @@ v <- reactiveValues(importActionValue = FALSE)
 
 output$sampleDistributionBox <- renderPlotly({
   if (length(variables$count.data) > 0) {
-
+    
     data <- variables$count.data
-  
+    
     
     log2data <- as.data.frame(log2(data))
     
@@ -497,20 +528,16 @@ output$sampleDistributionBox <- renderPlotly({
 # Render a density plot of sample distribution ----
 output$sampleDistributionDensity <- renderPlotly({
   if (length(variables$count.data) > 0) {
-
+    
     dt <- as.data.frame(variables$count.data)
-    if (input$densityFilter != "Do not filter") {
-      count <-
-        dt %>% filter_all(all_vars(. > input$densityFilter| is.na(.)))
-    } else {
-      count <- dt
-    }
+    
+    count <- dt
     data <- log2(count)
     
     group <- variables$group_import
-
+    
     densityTable <- apply(data, 2, function(x) {
-      density(x)
+      density(na.omit(x))
     })
     p <- plot_ly(type = "scatter", mode = "lines")
     for (i in 1:length(densityTable)) {
@@ -548,21 +575,11 @@ output$sampleDistributionDensityPanel <- renderUI({
     tagList(fluidRow(
       column(
         3,
-        popify(
-          helpText("Filter proteins with a total read count smaller than thresholds."),
-          title = "Reference",
-          content = 'Sultan, Marc, et al. <a href="http://science.sciencemag.org/content/321/5891/956">"A global view of gene activity and alternative splicing by deep sequencing of the human transcriptome."</a> <i>Science</i> 321.5891 (2008): 956-960.',
-          placement = "left"
-        ),
-        sliderTextInput(
-          inputId = "densityFilter",
-          label = "Filter proteins threshold",
-          choices = c("Do not filter", c(0:30))
-        ),
+        
         textInput(
           inputId = "sampleDistributionDenstityTitle",
           label = "Title",
-          value = "Raw Intensity",
+          value = "Sample density distribution",
           placeholder = "Original Raw Intensity"
         ),
         textInput(
@@ -633,7 +650,7 @@ output$sampleDistributionBoxPanel <- renderUI({
 # Filtering low count under different low number, barplot ----
 output$lowCountFilterByCutoff <- renderPlotly({
   if (length(variables$count.data) > 0) {
-
+    
     data <- variables$count.data
     originalCount <- nrow(data)
     
@@ -700,9 +717,9 @@ output$lowCountFilterByCutoffUI <- renderUI({
       column(
         3,
         popify(
-          helpText("Filter proteins with a total read count smaller than thresholds."),
+          helpText("Filter proteins with intensities smaller than thresholds."),
           title = "Reference",
-          content = 'Sultan, Marc, et al. <a href="http://science.sciencemag.org/content/321/5891/956">"A global view of protein activity and alternative splicing by deep sequencing of the human transcriptome."</a> <i>Science</i> 321.5891 (2008): 956-960.',
+          content = "Filter proteins by intensity values",
           placement = "left"
         ),
         sliderInput(
@@ -724,119 +741,13 @@ output$lowCountFilterByCutoffUI <- renderUI({
   }
 })
 
-# MDS Plot ----
-
-output$mdsPlotObject <- renderPlotly({
-  if (length(variables$count.data) > 0) {
-
-    dt <- variables$count.data
-    if (input$mds == "Nonmetric MDS") {
-      mds <-
-        data.frame(isoMDS(dist(
-          1 - cor(dt, method = input$mdsMethod),
-          method = input$mdsDistMethod
-        )))
-    } else {
-      mds <-
-        data.frame(cmdscale(dist(
-          1 - cor(dt, method = input$mdsMethod),
-          method = input$mdsDistMethod
-        )))
-    }
-    mds$name <- rownames(mds)
-    mdsG <- variables$group_import
-    mdsG$name <- rownames(mdsG)
-    mdsJ <- left_join(mds, mdsG, by = "name")
-    p <- plot_ly(
-      data = mdsJ,
-      x = mdsJ[, 1],
-      y = mdsJ[, 2],
-      type = "scatter",
-      mode = "text",
-      text = ~name,
-      color = ~group
-    ) %>%
-      layout(title = paste0(input$mds, " Plot")) %>%
-      plotly::config(
-        toImageButtonOptions = list(
-          format = "svg",
-          filename = paste0(input$mds, "_Plot")
-        )
-      )
-    
-    variables$mdsPlotplot <- p
-    variables$mdsPlot[["params"]] <- list(
-      "mds" = input$mds,
-      "mdsMethod" = input$mdsMethod,
-      "mdsDistMethod" = input$mdsDistMethod
-    )
-    p
-  } else {
-    return()
-  }
-})
-
-# MDS information
-output$MDShelpText <- renderUI({
-  helpText(
-    "Use all proteins' raw intensity to calculate",
-    input$mdsMethod,
-    "correlation coefficient (rho) to create a matrix of (1 - rho). Calculate the ",
-    input$mdsDistMethod,
-    " distances between samples and plot the result to a two-dimension MDS plot."
-  )
-})
-
-# Render MDS plot ----
-output$mdsUI <- renderUI({
-  if (dataImportCheck$importRunValue) {
-    tagList(fluidRow(
-      column(
-        3,
-        uiOutput("MDShelpText"),
-        selectInput(
-          inputId = "mdsMethod",
-          label = "Correlation Coefficient",
-          choices = c(
-            "Spearman" = "spearman",
-            "Pearson" = "pearson",
-            "Kendall" = "kendall"
-          )
-        ),
-        selectInput(
-          inputId = "mdsDistMethod",
-          label = "Distance Measure",
-          choices = c(
-            "Euclidean" = "euclidean",
-            "Maximum" = "maximum",
-            "Manhattan" = "manhattan",
-            "Canberra" = "canberra",
-            "Binary" = "binary",
-            "Minkowski" = "minkowski"
-          )
-        ),
-        selectInput(
-          inputId = "mds",
-          label = "MDS Method",
-          choices = c(
-            "Classical MDS" = "Classical MDS",
-            "Nonmetric MDS" = "Nonmetric MDS"
-          )
-        )
-      ),
-      column(9, plotlyOutput("mdsPlotObject") %>% withSpinner())
-    ))
-  } else {
-    helpText("No data for ploting. Please import dataset and assign group information first.")
-  }
-})
 
 # PCA Plot Scree ----
 output$pcaPlotObjectScree <- renderPlotly({
   if (length(variables$count.data) > 0) {
     dt <- variables$count.data
     if (input$pcaTransform == TRUE) {
-      data <- log1p(dt)
+      data <- log2(dt)
     } else {
       data <- dt
     }
@@ -844,7 +755,7 @@ output$pcaPlotObjectScree <- renderPlotly({
     if (!is.na(input$pcaTopGene) & input$pcaTopGene < nrow(data)) {
       data <- t(data[order(apply(data, 1, var), decreasing = TRUE)[1:input$pcaTopGene], ])
     }
-    
+    data <- data[,colSums(is.na(data))<nrow(data)]
     data.pca.all <- prcomp(data,
                            center = input$pcaCenter,
                            scale. = input$pcaScale
@@ -856,7 +767,8 @@ output$pcaPlotObjectScree <- renderPlotly({
     p <- plot_ly(
       x = colnames(summaryTable),
       y = summaryTable[2, ],
-      text = paste0(summaryTable[2, ] * 100, "%"),
+      #text = paste0(summaryTable[2, ] * 100, "%"),
+      text = sprintf("%.2f%%", summaryTable[2, ] * 100),
       textposition = "auto",
       type = "bar",
       name = "Proportion of Variance"
@@ -871,14 +783,14 @@ output$pcaPlotObjectScree <- renderPlotly({
         xaxis = list(title = "Principal Components"),
         yaxis = list(
           title = "Proportion of Variance",
-          tickformat = "%"
+          tickformat = ".2%"  # Limits to two decimal places
         ),
         title = "Scree Plot",
         legend = list(
           orientation = "h",
-          xanchor = "center",
-          x = 0.5,
-          y = 1.05
+          xanchor = "center"
+          # x = 0.5,
+          # y = 1.05
         )
       ) %>%
       plotly::config(
@@ -898,7 +810,7 @@ output$pcaPlotObject3d <- renderPlotly({
   if (length(variables$count.data) > 0) {
     dt <- variables$count.data
     if (input$pcaTransform == TRUE) {
-      data <- log1p(dt)
+      data <- log2(dt)
     } else {
       data <- dt
     }
@@ -906,6 +818,7 @@ output$pcaPlotObject3d <- renderPlotly({
     if (!is.na(input$pcaTopGene) & input$pcaTopGene < nrow(data)) {
       data <- t(data[order(apply(data, 1, var), decreasing = TRUE)[1:input$pcaTopGene], ])
     }
+    data <- data[,colSums(is.na(data))<nrow(data)]
     data.pca.all <- prcomp(data,
                            center = input$pcaCenter,
                            scale. = input$pcaScale
@@ -943,7 +856,7 @@ output$pcaPlotObject3d <- renderPlotly({
                yaxis = list(title = (paste0("PC2(",round(importance[2,2]*100,digits = 2),"%)"))),
                zaxis = list(title = (paste0("PC3(",round(importance[3,2]*100,digits = 2),"%)")))
              )
-             ) %>%
+      ) %>%
       plotly::config(
         toImageButtonOptions = list(
           format = "svg",
@@ -961,7 +874,7 @@ output$pcaPlotObject2d <- renderPlotly({
   if (length(variables$count.data) > 0) {
     dt <- variables$count.data
     if (input$pcaTransform == TRUE) {
-      data <- log1p(dt)
+      data <- log2(dt)
     } else {
       data <- dt
     }
@@ -970,7 +883,8 @@ output$pcaPlotObject2d <- renderPlotly({
       data <- t(data[order(apply(data, 1, var), decreasing = TRUE)[1:input$pcaTopGene], ])
     }
     
-   #perform PCA
+    data <- data[,colSums(is.na(data))<nrow(data)]
+    #perform PCA
     data.pca.all <- prcomp(data,
                            center = input$pcaCenter,
                            scale. = input$pcaScale
@@ -999,7 +913,7 @@ output$pcaPlotObject2d <- renderPlotly({
       text = ~name,
       type = "scatter",
       mode = mode,
-      marker = list(size = 8)
+      marker = list(size = 10)
     ) %>%
       layout(title = "PCA Plot (2D)",
              xaxis = list(title = (paste0("PC1(",round(importance[2,1]*100,digits = 2),"%)"))),
@@ -1011,7 +925,7 @@ output$pcaPlotObject2d <- renderPlotly({
           filename = "PCA_Plot2D"
         )
       )
-
+    
     variables$pca2d <- p
     p
   } else {
@@ -1024,7 +938,7 @@ output$pcaSummaryObject <- DT::renderDataTable({
   if (length(variables$count.data) > 0) {
     dt <- variables$count.data
     if (input$pcaTransform == TRUE) {
-      data <- log1p(dt)
+      data <- log2(dt)
     } else {
       data <- dt
     }
@@ -1032,60 +946,54 @@ output$pcaSummaryObject <- DT::renderDataTable({
     if (!is.na(input$pcaTopGene) & input$pcaTopGene < nrow(data)) {
       data <- t(data[order(apply(data, 1, var), decreasing = TRUE)[1:input$pcaTopGene], ])
     }
+    data <- data[,colSums(is.na(data))<nrow(data)]
     data.pca.all <- prcomp(data,
                            center = input$pcaCenter,
                            scale. = input$pcaScale
     )
     
-    variables$pcaParameter <- list(
-      "pcaTransform" = input$pcaTransform,
-      "pcaCenter" = input$pcaCenter,
-      "pcaScale" = input$pcaScale,
-      "pcaTopGene" = input$pcaTopGene
-    )
+    
     
     summaryTable <- summary(data.pca.all)$importance
     row.names(summaryTable)[1] <- "Standard Deviation"
     summaryTable <- t(summaryTable)
-    t <- DT::datatable(summaryTable, options = list(
-      dom = "Bt",
-      buttons = list(
-        "copy",
-        "print",
-        list(
-          extend = "collection",
-          buttons = c("csv", "excel", "pdf"),
-          text = "Download"
-        )
-      )
-    )) %>%
+    displayTable <- DT::datatable(summaryTable,
+                                  option = list(
+                                    rowReorder = TRUE,
+                                    deferRender = TRUE,
+                                    autoWidth = TRUE,
+                                    pageLength = 20,
+                                    searchHighlight = TRUE,
+                                    orderClasses = TRUE
+                                  )
+    ) %>%
       formatRound(
         columns = colnames(summaryTable),
         digits = 3
       ) %>%
       formatStyle(
         "Proportion of Variance",
-        background = styleColorBar(range(0, 1), "lightblue"),
-        backgroundSize = "98% 88%",
+        background = styleColorBar(range(0, 1), "steelblue"),
+        backgroundSize = "100% 90%",
         backgroundRepeat = "no-repeat",
         backgroundPosition = "center"
       ) %>%
       formatStyle(
         "Standard Deviation",
-        background = styleColorBar(range(0, summaryTable[, 1]), "lightblue"),
-        backgroundSize = "98% 88%",
+        background = styleColorBar(range(0, summaryTable[, 1]), "steelblue"),
+        backgroundSize = "100% 90%",
         backgroundRepeat = "no-repeat",
         backgroundPosition = "center"
       ) %>%
       formatStyle(
         "Cumulative Proportion",
-        background = styleColorBar(range(0, 1), "lightblue"),
-        backgroundSize = "98% 88%",
+        background = styleColorBar(range(0, 1), "steelblue"),
+        backgroundSize = "100% 90%",
         backgroundRepeat = "no-repeat",
         backgroundPosition = "center"
       )
-    variables$summaryPCA <- t
-    t
+    variables$summaryPCA <- displayTable
+    displayTable
   } else {
     return()
   }
@@ -1114,7 +1022,7 @@ output$pcaUI <- renderUI({
       column(
         3,
         helpText(
-          "PCA is performed on the top n proteins selected by none-zero row variance (or the most variable proteins)."
+          "PCA is performed on the top n varaible proteins without missing values."
         ),
         tipify(
           numericInput(
@@ -1124,7 +1032,7 @@ output$pcaUI <- renderUI({
             min = -1,
             step = 1
           ),
-          title = "How many of the most variable proteins should be used for calculating the PCA. Use all none-zero row variance protein if none value is supplied.",
+          title = "Number of top varied proteins for calculation",
           placement = "left"
         ),
         uiOutput("pcatopProteinPercent"),
@@ -1136,7 +1044,7 @@ output$pcaUI <- renderUI({
             right = TRUE,
             status = "primary"
           ),
-          title = "Whether the raw intensity should be performed log2 transformation before analysis.",
+          title = "Use log2 transformed data or original expression data",
           placement = "left"
         ),
         tipify(
@@ -1147,7 +1055,7 @@ output$pcaUI <- renderUI({
             right = TRUE,
             status = "primary"
           ),
-          title = "Whether the value should be shifted to be zero centered.",
+          title = "Whether values should be zero centered.",
           placement = "left"
         ),
         tipify(
@@ -1158,7 +1066,7 @@ output$pcaUI <- renderUI({
             right = TRUE,
             status = "primary"
           ),
-          title = "Whether the value should be scaled to have unit variance before the analysis.",
+          title = "Whether the value should be scaled.",
           placement = "left"
         ),
         tipify(
@@ -1186,7 +1094,7 @@ output$pcaUI <- renderUI({
             title = "Scree Plot",
             plotlyOutput("pcaPlotObjectScree") %>% withSpinner()
           )
-
+          
         )
       )
     ))
@@ -1207,20 +1115,21 @@ output$dendPlotObject <- renderPlotly({
     
     data <- data[rowSums(data) > 0, ]
     data <- data.frame(cor(data, method = input$dendCor))
-    data.cl.count <- length(unique(variables$group_import$group))
+    ngroups <- length(unique(variables$group_import$group))
     p <- heatmaply(
       data,
-      k_col = data.cl.count,
-      k_row = data.cl.count,
+      k_col = ngroups,
+      k_row = ngroups,
       hclust_method = input$dendCluster,
       labRow = rownames(data),
       labCol = colnames(data),
-      colors = GnBu(100)
+      distfun = input$dendCor,
+      colors = rev(RdBu(100))
     ) %>%
       plotly::config(
         toImageButtonOptions = list(
           format = "svg",
-          filename = "Hierarchical_Clustering"
+          filename = "Sample_Correlation"
         )
       )
     variables$original_heatmap <- p
@@ -1260,13 +1169,13 @@ output$dendUI <- renderUI({
             min = -1,
             step = 1
           ),
-          title = "How many of the most variable proteins should be used for calculating correlation. Use all none-zero row variance protein if none value is supplied.",
+          title = "Number of most variable proteins used",
           placement = "left"
         ),
         uiOutput("dendTopProteinPreview"),
         selectInput(
           inputId = "dendCluster",
-          label = "Agglomeration Method",
+          label = "Clustering method",
           choices = c(
             "Complete" = "complete",
             "Ward.D" = "ward.D",
@@ -1278,14 +1187,14 @@ output$dendUI <- renderUI({
         ),
         selectInput(
           inputId = "dendCor",
-          label = "Distance Measure",
+          label = "Distance function",
           choices = c(
             "Spearman" = "spearman",
             "Pearson" = "pearson"
           )
         )
       ),
-      column(9, plotlyOutput("dendPlotObject") %>% withSpinner())
+      column(9, plotlyOutput("dendPlotObject",height = 700) %>% withSpinner())
     ))
   } else {
     helpText("No data for ploting. Please import dataset and assign group information first.")

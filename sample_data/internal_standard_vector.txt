@@ -1,2 +1,0 @@
-batch4	batch4.sig131C	standard
-batch5	batch5.sig131C	non_standard

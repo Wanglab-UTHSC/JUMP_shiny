@@ -1,0 +1,17 @@
+Sample,Group,Batch,Info
+Group1_1,Group1,B1,internal
+Group1_2,Group1,B2,internal
+Group1_3,Group1,B3,internal
+Group1_4,Group1,B4,internal
+Group2_1,Group2,B1,normal
+Group2_2,Group2,B2,normal
+Group2_3,Group2,B3,normal
+Group2_4,Group2,B4,normal
+Group3_1,Group3,B1,normal
+Group3_2,Group3,B2,normal
+Group3_3,Group3,B3,normal
+Group3_4,Group3,B4,normal
+Group4_1,Group4,B1,normal
+Group4_2,Group4,B2,normal
+Group4_3,Group4,B3,normal
+Group4_4,Group4,B4,normal

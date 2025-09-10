@@ -7,118 +7,120 @@ library(dplyr)
 library(stringr)
 library(ggplot2)
 library(plotly)
-# library(factoextra)
-# library(ggpubr)# cor.test
-# library(EnhancedVolcano)
 
 #if run correction button is clicked, run the test
 corRun <- reactiveValues(corRunValue = FALSE)
 
-observeEvent(input$confirmedCovList,{
-  if (input$CovInput == "") {
-    sendSweetAlert(
-      session = session,
-      title = "ERROR",
-      text = "Please input group information!",
-      type = "error"
-    )
-    return()
+output$covVars <- renderUI({
+  
+  df <- variables$group
+  if (is.null(colnames(df))) {
+    vars = NULL
+  } else {
+    vars = colnames(df)[2: ncol(df)]    
   }
   
-  tryCatch(
-    {
-      progressSweetAlert(
-        session = session,
-        id = "covinput",
-        title = "Uploading covariates...",
-        display_pct = TRUE,
-        value = 0
-      )
-      
-      cov_group_data <- fread(input$CovInput, header = TRUE)
-      #store group information
-      if(colnames(cov_group_data) [1] == "Sample"){
-        colnames(cov_group_data)[1] <- tolower(colnames(cov_group_data)[1])
-      }
-      variables$cov_group <- cov_group_data
-      cov_group <- colnames(cov_group_data)
-      cov_group <- cov_group[,-1]
-    
-      
-    },
-    
-    error = function(e) {
-      sendSweetAlert(
-        session = session,
-        title = "ERROR",
-        text = "Check your group information format!",
-        type = "error"
-      )
-      return()
-    },
-    warning = function(w) {
-      sendSweetAlert(
-        session = session,
-        title = "Group error!",
-        text = "Check your group information format!",
-        type = "error"
-      )
-      return()
-    }
-  )
-  
-  
-  updateProgressBar(
-    session = session,
-    id = "covinput",
-    title = "Loading covriates...",
-    value = 40
-  )
-  
-  output$covVars <- renderUI({
-    df = variables$cov_group
-    if (is.null(colnames(df))) {
-      Vars = NULL
-    } else {
-      Vars = colnames(df)[2: ncol(df)]    
-    }
-    checkboxGroupButtons("selectVars", "Select covariate",
-                choices = Vars)
-    # conditionalPanel(
-    #   condition = "input.covVars == true",
-    #   numericInput(
-    #     inputId = "covVarPercent",
-    #     label = "Portion to keep",
-    #     value = 1,
-    #     min = 0,
-    #     step = 0.1
-    #   )
-    # )
-  })
-  
-  updateProgressBar(
-    session = session,
-    id = "covinput",
-    title = "Data Processing",
-    value = 60
-  )
-  
-  updateProgressBar(
-    session = session,
-    id = "covinput",
-    title = "Data Processing",
-    value = 100
-  )
-  
-  closeSweetAlert(session = session)
-  sendSweetAlert(
-    session = session,
-    title = "DONE",
-    text = "Covariates uploaded successfully",
-    type = "success"
-  )
-  
+  selectInput("covGroup", "Covariance group",
+              choices = vars,multiple = TRUE)
 })
+
+# observeEvent(input$confirmedCovList,{
+#   # if (input$CovInput == "") {
+#   #   sendSweetAlert(
+#   #     session = session,
+#   #     title = "ERROR",
+#   #     text = "Please input group information!",
+#   #     type = "error"
+#   #   )
+#   #   return()
+#   # }
+#   # 
+#   tryCatch(
+#     {
+#       progressSweetAlert(
+#         session = session,
+#         id = "covinput",
+#         title = "Retrieving group information...",
+#         display_pct = TRUE,
+#         value = 0
+#       )
+#       
+# 
+#       
+#       cov_group_data <- fread(input$CovInput, header = TRUE)
+#       #store group information
+#       if(colnames(cov_group_data) [1] == "Sample"){
+#         colnames(cov_group_data)[1] <- tolower(colnames(cov_group_data)[1])
+#       }
+#       variables$cov_group <- cov_group_data
+#       cov_group <- colnames(cov_group_data)
+#       cov_group <- cov_group[,-1]
+#     
+#       
+#     },
+#     
+#     error = function(e) {
+#       sendSweetAlert(
+#         session = session,
+#         title = "ERROR",
+#         text = "Check your group information format!",
+#         type = "error"
+#       )
+#       return()
+#     },
+#     warning = function(w) {
+#       sendSweetAlert(
+#         session = session,
+#         title = "Group error!",
+#         text = "Check your group information format!",
+#         type = "error"
+#       )
+#       return()
+#     }
+#   )
+#   
+#   
+#   updateProgressBar(
+#     session = session,
+#     id = "covinput",
+#     title = "Loading covriates...",
+#     value = 40
+#   )
+#   
+#   # output$covVars <- renderUI({
+#   #   df = variables$cov_group
+#   #   if (is.null(colnames(df))) {
+#   #     Vars = NULL
+#   #   } else {
+#   #     Vars = colnames(df)[2: ncol(df)]    
+#   #   }
+#   #   checkboxGroupButtons("selectVars", "Select covariate",
+#   #               choices = Vars)
+#   # })
+#   
+#   updateProgressBar(
+#     session = session,
+#     id = "covinput",
+#     title = "Data Processing",
+#     value = 60
+#   )
+#   
+#   updateProgressBar(
+#     session = session,
+#     id = "covinput",
+#     title = "Data Processing",
+#     value = 100
+#   )
+#   
+#   closeSweetAlert(session = session)
+#   sendSweetAlert(
+#     session = session,
+#     title = "DONE",
+#     text = "Covariates uploaded successfully",
+#     type = "success"
+#   )
+#   
+# })
 
 observeEvent(input$runCorrection,{
   progressSweetAlert(
@@ -128,9 +130,18 @@ observeEvent(input$runCorrection,{
     display_pct = TRUE,
     value = 0
   )
+
+  #select covariates columns
+  choice <- input$covGroup
+  group <- as.data.frame(variables$group)
   
-  choice <- input$selectVars
-  group <- as.data.frame(variables$cov_group)
+  if(colnames(group)[1] == "Sample"){
+    colnames(group)[1] <- tolower(colnames(group)[1])
+  }
+  
+  #save covariates group information
+  group <- group[c("sample",choice)]
+  variables$cov_group <- group
 
   
   #based on inport load normalized data or original data if normalization not required
@@ -144,8 +155,6 @@ observeEvent(input$runCorrection,{
   
   ##check if there are NA values in sample
   row.names(group) <- group$sample
-  select <- c("sample",choice)
-  group <- group[select]
   group_completed <- group[complete.cases(group),]
   group_na <- group[!complete.cases(group),]
   dt_na <- dt[,row.names(group_na)]
@@ -202,6 +211,7 @@ observeEvent(input$runCorrection,{
   )
   
   
+  #make linear regression expression formula
   frm <- "Expression ~"
   
   if(length(choice)>=2){

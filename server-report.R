@@ -1,7 +1,5 @@
 # server-report.R
 
-library(officer)
-
 runReport <- reactiveValues(runReportValue = FALSE)
 
 
