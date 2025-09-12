@@ -40,4 +40,4 @@ Enrichment analysis is used to identify biological pathways, molecular functions
 If you have any questions or suggestions, please contact:
 
 Aijun Zhang: azhang97@stjude.org or azhang16@uthsc.edu
-Xusheng Wang: xusheng.wang@stjude.org or xwang39@uthsc.edu
+Xusheng Wang: xwang39@uthsc.edu
