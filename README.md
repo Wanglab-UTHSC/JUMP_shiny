@@ -18,7 +18,7 @@ Welcome to JUMP shiny, a comprehensive web platform designed for mass spectromet
 
 ## Getting Started
 ### Accessing JUMP Shiny
-To begin your proteomic analysis, please visit the JUMP shiny web platform (https://jumpshiny.stjude.org). If you would like to process large datasets, you can use the local version available on GitHub (https://github.com/JUMPSuite/JUMPshiny) for more efficient processing and analysis.
+To begin your proteomic analysis, please visit the JUMP shiny web platform (https://jumpshiny.genenetwork.org). If you would like to process large datasets, you can use the local version available on GitHub (https://github.com/Wanglab-UTHSC/JUMP_shiny) for more efficient processing and analysis.
 ### User Interface Overview
 #### Experimental Design
 
