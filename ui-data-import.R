@@ -102,16 +102,10 @@ column(
       title = tagList(icon("bar-chart"), "Intensity Distribution"),
       uiOutput("sampleDistributionBoxPanel")
     ),
-    # tabPanel(
-    #   title = tagList(icon("filter"), "Filtering Threshold"),
-    #   uiOutput("lowCountFilterByCutoffUI")
-    # ),
     tabPanel(
       title = tagList(icon("area-chart"), "Density Plot"),
       uiOutput("sampleDistributionDensityPanel")
     ),
-    # tabPanel(title = tagList(icon("object-group"), "QQ plot"),
-    #          uiOutput("QQplot")),
     tabPanel(title = tagList(icon("object-group"), "PCA"),
              uiOutput("pcaUI")),
     tabPanel(title = tagList(icon("sitemap"), "Sample Correlation"),
