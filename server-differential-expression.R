@@ -221,7 +221,7 @@ observeEvent(input$DETestType,{
     comparison[g] = paste(cc, collapse = ",")
   }
   ####added for test
-  # data_imputed <- df
+  data_imputed <- df
   
   # 
   # 
@@ -232,125 +232,109 @@ observeEvent(input$DETestType,{
   #   value = 40
   # )
   # 
-  # ############Imputation
-   nGroups <- length(comparison)
-   groups <- list()
-   nSamples <- 0
-   samples <- NULL
+  ############Imputation
+  nGroups <- length(comparison)
+  groups <- list()
+  nSamples <- 0
+  samples <- NULL
+
+  for (g in 1:nGroups) {
+    groups[[g]] <- unlist(strsplit(comparison[g], ","))
+    nSamples <- nSamples + length(groups[[g]])
+    samples[[g]] <- groups[[g]]
+  }
+
+
+  grouplist <- list()
+  for (g in 1:nGroups) {
+    grouplist[[g]] <- df[, samples[[g]]]
+  }
+
+  names(grouplist) <- paste0("group", seq_along(grouplist))
+  count_non_na_per_group <- as.data.frame(sapply(grouplist, function(x) {
+    apply(x, 1, function(y) sum(!is.na(y)))
+  }))
+
+  # Generalized imputation function for handling multiple groups with data
+  impute_data <- function(data, grouplist, count_non_na_per_group) {
+    nGroups <- length(grouplist)  # Number of groups
+    group_names <- names(grouplist)  # Group names: group1, group2, ..., groupN
+
+    for (i in 1:nrow(data)) {
+      counts <- count_non_na_per_group[i, ]
+
+      # Find indices for each group's samples in the data
+      idx <- lapply(1:nGroups, function(g) match(colnames(grouplist[[g]]), colnames(data)))
+
+      # Case 1: Handle groups with missing and available data
+      groups_with_data <- which(counts > 1)
+      groups_without_data <- which(counts < 1)
+
+
+
+      #if one group has more than one non-NA value and the other group has no value
+      if (length(groups_with_data) >= 1 && length(groups_without_data) > 0) {
+        group_more <- Reduce(cbind,grouplist[which(counts > 1)])
+        idx_more <- unlist(idx[groups_with_data])
+
+        for (g in groups_without_data) {  # Iterate over each group without data
+          group_less <- grouplist[[g]]
+          idx_less <- idx[[g]]
+
+          # Determine the difference in non-NA values between the groups
+          max_diff <- max(counts[counts!=0])
+          diff <- min(max_diff,ncol(group_less), min(sapply(grouplist, ncol)))
+
+          # Find the minimum value in each column of group_less
+          col_min_values <- sapply(idx_less, function(j) min(data[, j], na.rm = TRUE))
+
+
+
+          # Sort the minimum values and select the top n (smallest) values
+          top_n_mins <- sort(col_min_values, na.last = NA, decreasing = TRUE)[1:diff]
+
+          # # Randomly assign top n values into missing columns
+          # random_select_col <- sample(idx_less, diff)
+
+          for (j in 1:diff) {
+            col <- idx_less[j]
+            data[i, col] <- top_n_mins[j]
+          }
+        }
+      }
+
+      # Case 2: All groups have less than 2 non-missing values
+      if (all(counts <= 1)) {
+        data[i, ] <- NA  # Indicate to discard this row later
+      }
+
+      # Case 3: All groups have more than 1 non-missing value (do nothing)
+    }
+
+    # Discard rows with all NAs (from case 2)
+    data <- data[apply(data, 1, function(row) !all(is.na(row))), ]
+
+    return(data)
+  }
   # 
-   for (g in 1:nGroups) {
-     groups[[g]] <- unlist(strsplit(comparison[g], ","))
-     nSamples <- nSamples + length(groups[[g]])
-     samples[[g]] <- groups[[g]]
-   }
+  # Apply imputation or cleaning based on the selection
+  df <- cbind(variables$CountData[, c(1, 2)], df)
+
+  # Selection logic for imputation
+  if (input$ImputationSelection == "Imputation") {
+    data_imputed <- impute_data(df, grouplist, count_non_na_per_group)
+  } else if (input$ImputationSelection == "CleanData") {
+    data_imputed <- df[complete.cases(df[2:ncol(df)]), ]
+  } else {
+    data_imputed <- df
+  }
+
    
-  # 
-   grouplist <- list()
-   for (g in 1:nGroups) {
-     grouplist[[g]] <- df[, samples[[g]]]
-   }
-  # 
-   names(grouplist) <- paste0("group", seq_along(grouplist))
-   count_non_na_per_group <- as.data.frame(sapply(grouplist, function(x) {
-     apply(x, 1, function(y) sum(!is.na(y)))
-   }))
-  # 
-  # # Generalized imputation function for handling multiple groups with data
-   impute_data <- function(data, grouplist, count_non_na_per_group) {
-     nGroups <- length(grouplist)  # Number of groups
-     group_names <- names(grouplist)  # Group names: group1, group2, ..., groupN
-  #   
-     for (i in 1:nrow(data)) {
-       counts <- count_non_na_per_group[i, ]
-       
-       # Find indices for each group's samples in the data
-       idx <- lapply(1:nGroups, function(g) match(colnames(grouplist[[g]]), colnames(data)))
-  #     
-       # Case 1: Handle groups with missing and available data
-       groups_with_data <- which(counts > 1)
-       groups_without_data <- which(counts < 1)
-  #     
-  #     
-  #     
-       #if one group has more than one non-NA value and the other group has no value
-       if (length(groups_with_data) >= 1 && length(groups_without_data) > 0) {
-         group_more <- Reduce(cbind,grouplist[which(counts > 1)])
-         idx_more <- unlist(idx[groups_with_data])
-         
-         for (g in groups_without_data) {  # Iterate over each group without data
-           group_less <- grouplist[[g]]
-           idx_less <- idx[[g]]
-  #         
-  #         # Determine the difference in non-NA values between the groups
-           max_diff <- max(counts[counts!=0])
-           diff <- min(max_diff,ncol(group_less), min(sapply(grouplist, ncol)))
-  #         
-           # Find the minimum value in each column of group_less
-           col_min_values <- sapply(idx_less, function(j) min(data[, j], na.rm = TRUE))
-           
-  #         
-  #         
-  #         # Sort the minimum values and select the top n (smallest) values
-           top_n_mins <- sort(col_min_values, na.last = NA, decreasing = TRUE)[1:diff]
-  #         
-           # # Randomly assign top n values into missing columns
-           # random_select_col <- sample(idx_less, diff)
-  #         
-           for (j in 1:diff) {
-             col <- idx_less[j]
-             data[i, col] <- top_n_mins[j]
-           }
-         }
-       }
-  #     
-  #     # Case 2: All groups have less than 2 non-missing values
-       if (all(counts <= 1)) {
-         data[i, ] <- NA  # Indicate to discard this row later
-       }
-  #     
-       # Case 3: All groups have more than 1 non-missing value (do nothing)
-     }
-  #   
-  #   # Discard rows with all NAs (from case 2)
-     data <- data[apply(data, 1, function(row) !all(is.na(row))), ]
-  #   
-     return(data)
-   }
-  # 
-  # # Apply imputation or cleaning based on the selection
-   df <- cbind(variables$CountData[, c(1, 2)], df)
-  # 
-  # # Selection logic for imputation
-   if (input$ImputationSelection == "Imputation") {
-     data_imputed <- impute_data(df, grouplist, count_non_na_per_group)
-   } else if (input$ImputationSelection == "CleanData") {
-     data_imputed <- df[complete.cases(df[3:ncol(df)]), ]
-   } else {
-     data_imputed <- df
-   }
-   
-   description <- data_imputed[c(1,2)]
-   data_imputed <- data_imputed[-c(1,2)]
+  # description <- data_imputed[c(1,2)]
+  data_imputed <- data_imputed[-c(1,2)]
   #perform limma
   statRes = reactive(statTest(data_imputed, level, comparison,dfSample,data.cl,factors))
-  # 
-  # updateProgressBar(
-  #   session = session,
-  #   id = "DEProgress",
-  #   title = "Calculate differentially expressed peptides/proteins",
-  #   value = 50
-  # )
-  # 
-  # 
-  # 
-  # updateProgressBar(
-  #   session = session,
-  #   id = "DEProgress",
-  #   title = "Data Processing",
-  #   value = 60
-  # )
-  # 
-  # 
+ 
   # # Data processing
   shinyCatch({statres = statRes()})
   dfRaw = data2()$rawData
@@ -376,9 +360,9 @@ observeEvent(input$DETestType,{
   # Select DE peptides/proteins and organize a dataset for subsequent analyses
   rowInd = which(statres$res[[sigMetric]] < sigCutoff & absLogFC >= logFC)
   if (nGroups == 2) {
-    exprs = cbind(description,exprs, `p-value` = statres$res$`p-value`, FDR = statres$res$FDR, Log2Fold = resLogFC)
+    exprs = cbind(variables$CountData[, c(1, 2)],exprs, `p-value` = statres$res$`p-value`, FDR = statres$res$FDR, Log2Fold = resLogFC)
   } else if (nGroups > 2) {
-    exprs = cbind(description,exprs, `p-value` = statres$res$`p-value`, FDR = statres$res$FDR)
+    exprs = cbind(variables$CountData[, c(1, 2)],exprs, `p-value` = statres$res$`p-value`, FDR = statres$res$FDR)
     exprs = cbind(exprs, resLogFC)
   }
   
@@ -1160,6 +1144,23 @@ observeEvent(input$RunVolcano, {
     a <- list()
     for (i in seq_len(nrow(top_prots))) {
       m <- top_prots[i, ]
+      # Conditional positioning and coloring based on log2fold change
+      if (m[["logfc"]] < 0) {
+        # Negative log2fold: annotate on the left
+        ax_pos <- -20
+      } else {
+        # Positive log2fold: annotate on the right
+        ax_pos <- 20
+      }
+      
+      # Conditional coloring based on fold change cutoffs
+      if (m[["logfc"]] < DownCut) {
+        text_color <- "blue"
+      } else if (m[["logfc"]] > UpCut) {
+        text_color <- "red"
+      } else {
+        text_color <- "black"  # Default color for genes between cutoffs
+      }
       a[[i]] <- list(
         x = m[["logfc"]],
         y = -log10(m[["significance"]]),
@@ -1169,8 +1170,9 @@ observeEvent(input$RunVolcano, {
         showarrow = TRUE,
         arrowhead = 4,
         arrowsize = 0.5,
-        ax = 20,
-        ay = -20
+        ax = ax_pos,
+        ay = -20,
+        font = list(color = text_color)
       )
     }
     
@@ -1231,10 +1233,11 @@ observeEvent(input$RunVolcano, {
 output$protBarPlotInVolcano <- renderPlotly({
   # Read in hover data
   eventdata <- event_data("plotly_click", source = "volcano")
-  validate(need(
-    !is.null(eventdata),
-    "Click the point to show protein's signal level of interest."
-  ))
+  shiny::req(eventdata)
+  # validate(need(
+  #   !is.null(eventdata),
+  #   "Click the point to show protein's signal level of interest."
+  # ))
   # Get point number
   prot_id <- eventdata$key
   # Get expression level (Original)
@@ -1386,12 +1389,6 @@ output$heatmapParameter <- renderUI({
                   "Column" = "column"),
       selected = "both"
     ),
-    selectInput(
-      inputId = "colorSelectionMethod",
-      label = "Color Selection Method",
-      choices = c("Color map", "Two colors", "Three colors")
-    ),
-    uiOutput("heatmapColorSelectionPanel"),
     sliderInput(
       "heatmapColorNumber",
       "Select the number of colors to be in the palette",
@@ -1400,8 +1397,6 @@ output$heatmapParameter <- renderUI({
       step = 1,
       value = 20
     ),
-    tags$b("Color Preview"),
-    plotOutput("colorPreview", height = "20px"),
     numericInput(
       inputId = "heatmapHeight",
       label = "Height of Heatmap",
@@ -1500,152 +1495,15 @@ output$heatmapSelectProt <- renderUI({
   
 })
 
-observeEvent(input$colorSelectionMethod, {
-  output$heatmapColorSelectionPanel <- renderUI({
-    switch(input$colorSelectionMethod,
-           "Color map" = {
-             selectInput(
-               "heatmapColor",
-               "Choose Colormap",
-               choices = list(
-                 "PiYG", "PRGn", "BrBG", "PuOr", "OrRd",
-                 "Oranges", "RdGy", "RdBu", "RdYlBu", "RdYlGn", 
-                 "Spectral", "coolwarm"
-               ),
-               selected = "RdBu"
-             )
-           },
-           "Two colors" = createColorSelectors(),
-           "Three colors" = createColorSelectors(includeMiddle = TRUE)
-    )
-  })
-})
-
-createColorSelectors <- function(includeMiddle = FALSE) {
-  tagList(
-    spectrumInput(
-      inputId = "heatmapTwoColorLow",
-      label = "Low",
-      choices = list(
-        list(
-          "blue", "black", "gray30", "white",
-          "#2066a8", "#3594cc", "forestgreen"
-        ),
-        as.list(brewer.pal(n = 9, name = "Blues")),
-        as.list(brewer.pal(n = 9, name = "Greens")),
-        as.list(brewer.pal(n = 11, name = "Spectral")),
-        as.list(brewer.pal(n = 8, name = "Dark2"))
-      ),
-      options = list(`toggle-palette-more-text` = "Show more")
-    ),
-    if (includeMiddle) {
-      spectrumInput(
-        inputId = "heatmapTwoColorMiddle",
-        label = "Middle",
-        choices = list(
-          list(
-            "white", "gray50", "steelblue", 
-            "#0000FF", "forestgreen"
-          ),
-          as.list(brewer.pal(n = 9, name = "Blues")),
-          as.list(brewer.pal(n = 9, name = "Greens")),
-          as.list(brewer.pal(n = 8, name = "Accent")),
-          as.list(brewer.pal(n = 8, name = "Dark2"))
-        ),
-        options = list(`toggle-palette-more-text` = "Show more")
-      )
-    },
-    spectrumInput(
-      inputId = "heatmapTwoColorHigh",
-      label = "High",
-      choices = list(
-        list(
-          "red", "brown", "orange", "white"
-        ),
-        as.list(brewer.pal(n = 9, name = "Reds")),
-        as.list(brewer.pal(n = 9, name = "Oranges")),
-        as.list(brewer.pal(n = 8, name = "Accent")),
-        as.list(brewer.pal(n = 8, name = "Dark2"))
-      ),
-      options = list(`toggle-palette-more-text` = "Show more")
-    )
-  )
-}
-
-colorPanel <- reactive({
-  if (input$colorSelectionMethod == "Color map" && length(input$heatmapColor) > 0) {
-    colorPal <- switch(
-      input$heatmapColor,
-      "PiYG" = rev(PiYG(input$heatmapColorNumber)),
-      "PRGn" = PRGn(input$heatmapColorNumber),
-      "BrBG" = BrBG(input$heatmapColorNumber),
-      "PuOr" = PuOr(input$heatmapColorNumber),
-      "OrRd" = OrRd(input$heatmapColorNumber),
-      "Oranges" = Oranges(input$heatmapColorNumber),
-      "RdGy" = rev(RdGy(input$heatmapColorNumber)),
-      "RdBu" = rev(RdBu(input$heatmapColorNumber)),
-      "RdYlBu" = rev(RdYlBu(input$heatmapColorNumber)),
-      "RdYlGn" = rev(RdYlGn(input$heatmapColorNumber)),
-      "Spectral" = Spectral(input$heatmapColorNumber),
-      "coolwarm" = cool_warm(input$heatmapColorNumber)
-    )
-  } else if (input$colorSelectionMethod == "Two colors" && length(input$heatmapTwoColorLow) > 0) {
-    colorPal <- colorRampPalette(c(input$heatmapTwoColorLow, input$heatmapTwoColorHigh))(input$heatmapColorNumber)
-  } else if (input$colorSelectionMethod == "Three colors" && length(input$heatmapTwoColorLow) > 0) {
-    colorPal <- colorRampPalette(c(input$heatmapTwoColorLow, input$heatmapTwoColorMiddle, input$heatmapTwoColorHigh))(input$heatmapColorNumber)
-  } else {
-    colorPal <- c("white")
-  }
-  
-  colorPal
-})
-
-output$colorPreview <- renderPlot({
-  colorPal <- colorPanel()
-  op <- par(mar = c(0.5, 0, 0, 0))
-  plot(
-    c(0, length(colorPal)),
-    c(0, 1),
-    type = "n",
-    xlab = "",
-    ylab = "",
-    ann = FALSE,
-    bty = "n",
-    xaxt = "n",
-    yaxt = "n"
-  )
-  rect(0:(length(colorPal) - 1), 0, 1:(length(colorPal)), 1, col = colorPal, lwd = 0)
-  par(op)
-})
-
 observeEvent(input$heatmapRun,{
   HeatmapRun$heatmapRunValue = FALSE
-  # progressSweetAlert(
-  #   session = session,
-  #   id = "heatmapProgress",
-  #   title = "Work in progress",
-  #   display_pct = TRUE,
-  #   value = 0
-  # )
-  # 
-  # updateProgressBar(
-  #   session = session,
-  #   id = "heatmapProgress",
-  #   title = "Processing data",
-  #   value = 10
-  # )
+  
   
   data <- variables$result
   res <- variables$res
   dfSample = variables$sampleInfo
-  colorPal <- colorPanel()
   
-  # updateProgressBar(
-  #   session = session,
-  #   id = "heatmapProgress",
-  #   title = "Processing selected lists",
-  #   value = 30
-  # )
+  
   
   #get the selected number of proteins for analysis
   if(input$heatmapProtSelectType == "By_list"){
@@ -1676,22 +1534,17 @@ observeEvent(input$heatmapRun,{
     )
     return()
   }
-  # updateProgressBar(
-  #   session = session,
-  #   id = "heatmapProgress",
-  #   title = "Updating parameters",
-  #   value = 50
-  # )
+  
   
   #filter with Log2Fold threshold
   log2f <- input$heatmap_log2fc
   log2filterUp <- res %>%
     dplyr::select(contains("Log2Fold")) %>%
     filter(if_any(contains("Log2Fold"), ~ . >= log2f))
-
+  
   selectList <- row.names(sampleData) %in% row.names(log2filterUp)
   df1 <- sampleData[selectList, ]
-
+  
   log2filterDown <- res %>%
     dplyr::select(contains("Log2Fold")) %>%
     filter(if_any(contains("Log2Fold"), ~ . <= -log2f))
@@ -1703,7 +1556,7 @@ observeEvent(input$heatmapRun,{
   overlapping_rows <- rownames(df1)[rownames(df1) %in% rownames(df2)]
   non_overlapping_rows <- rownames(df2)[!rownames(df2) %in% rownames(df1)]
   sampleData <- rbind(df1, df2[non_overlapping_rows, ])
-
+  
   # 
   # #update input values
   # updateNumericInput(session = session,inputId = "heatmap_log2fc",value = input$heatmap_log2fc)
@@ -1713,7 +1566,7 @@ observeEvent(input$heatmapRun,{
   #remove unnecessary columns
   sampleData = sampleData %>% dplyr::select(-contains(c("Log2Fold","p-value","FDR")))
   sampleData = sampleData[3:ncol(sampleData)]
-
+  
   # filter by selected groups
   groupList <- variables$groupList2
   selected = unlist(groupList,use.names = F)
@@ -1726,14 +1579,7 @@ observeEvent(input$heatmapRun,{
   # 
   #change to heatmap format
   mat = as.matrix(sampleData)
-  # 
-  # #check NAs
-  # giveNAs = which(is.na(as.matrix(dist(mat))),arr.ind=TRUE)
-  # tab = sort(table(c(giveNAs)),decreasing=TRUE)
-  # checkNA = sapply(1:length(tab),function(i){
-  #   sum(is.na(as.matrix(dist(mat[-as.numeric(names(tab[1:i])),]))))
-  # })
-  # rmv = names(tab)[1:min(which(checkNA==0))]
+  
   # 
   if(input$hm_NA == T) mat <- mat[complete.cases(mat),]
   # #mat <- mat[complete.cases(mat),]
@@ -1762,9 +1608,11 @@ observeEvent(input$heatmapRun,{
     p <- heatmaply(
       mat,
       #k_col = length(variables$factors),
-      colors = colorPal,
+      colors = rev(RdBu(input$heatmapColorNumber)),
       na.value = "grey50",
       na.rm = T,
+      Colv = F,
+      Rowv = F,
       dist_method = input$heatmapDist,
       hclust_method = input$heatmapCluster,
       xlab = "Sample",
@@ -1781,34 +1629,11 @@ observeEvent(input$heatmapRun,{
           format = "svg",
           filename = input$heatmapTitle
         ))
-
+    
     variables$de_heatmap <- p
     p
   })
-  # 
-  # 
-  # updateProgressBar(
-  #   session = session,
-  #   id = "heatmapProgress",
-  #   title = "Extracting data",
-  #   value = 90
-  # )
-  # updateProgressBar(
-  #   session = session,
-  #   id = "heatmapProgress",
-  #   title = "All done",
-  #   value = 100
-  # )
-   HeatmapRun$heatmapRunValue <- input$heatmapRun
-  # closeSweetAlert(session = session)
-  # sendSweetAlert(
-  #   session = session,
-  #   title = "Completed!",
-  #   type = "success"
-  # )
-  # updateCheckboxInput(session, "showrowlabel", value = rowlabelshow)
-  # updateCheckboxInput(session, "showdendrow", value = rowdend)
+  
+  HeatmapRun$heatmapRunValue <- input$heatmapRun
   
 })
-
-

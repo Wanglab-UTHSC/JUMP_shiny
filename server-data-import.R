@@ -36,6 +36,19 @@ observeEvent(input$uploadExpressionData, {
       nNA <- sum(rowSums(is.na(rawdata))>0)
       variables$nNA <- nNA
       #rawdata<- na.omit(rawdata)
+
+      # Allow users to upload data with only collumn names
+      num_start <- which(sapply(rawdata, is.numeric))[1]
+      if(num_start <=2){
+        pid <- paste0("Protein", seq_len(nrow(rawdata)))
+        GN <- rawdata[[1]] 
+        Description <-paste0("Description", seq_len(nrow(rawdata)))
+        temp <- data.frame(pid = pid, 
+                           GN = GN,
+                           Description = Description)
+        rawdata<- cbind(temp,rawdata)
+        rawdata <- rawdata[-4]
+      }
       
       #check the format
       if(input$dataType == "jumpq"){
@@ -68,7 +81,7 @@ observeEvent(input$uploadExpressionData, {
           }
           
         }
-        first <- batchidx[-1]+5
+        first <- batchidx[length(batchidx)]+5
         last <- ncol(rawdata)
         colnum <- c(colnum, first:last)
         rawdata <- rawdata[,colnum]
@@ -109,7 +122,7 @@ observeEvent(input$uploadExpressionData, {
   
   
   #Get unique row names
-  validate(dupValidate(new))
+  #validate(dupValidate(new))
   new <- new[!duplicated(new$pid),]
   variables$dup <- nrow(new[duplicated(new$pid),])
   row.names(new) <- new$pid
@@ -132,15 +145,15 @@ observeEvent(input$uploadExpressionData, {
   
 })
 
-# datasetInput <- reactive({
-#   variables$CountData
-# })
+datasetInput <- reactive({
+  variables$CountData
+})
 
 
 # Render a table of raw count data, adding color ----
 
 output$table <- DT::renderDataTable({
-  df <- variables$CountData
+  df <- datasetInput()
   temp <- df[,3:ncol(variables$CountData)]
   temp <- round(temp,digits = 0)
   df <- cbind(variables$CountData[,c(1,2)],temp)
@@ -149,6 +162,7 @@ output$table <- DT::renderDataTable({
   DT::datatable(
     df,
     colnames = c("Accession Number" = 1),
+    selection = 'single',
     extensions = c("Scroller","RowReorder"),
     option = list(
       rowReorder = TRUE,
@@ -171,90 +185,218 @@ output$emptyTable <- renderUI({
   if (nrow(variables$CountData) == 0) {
     tags$p("No data to show. Download", tags$code("Example"), "or", tags$code("Upload"), "your own dataset.")
   } else {
-    DT::dataTableOutput("table")
+    tagList(
+      fluidRow(
+        column(
+          12,
+          DT::dataTableOutput("table"),
+          plotlyOutput('raw_boxplot')%>% withSpinner()
+        )
+      )
+    )
+    
   }
 })
 
-observeEvent(input$confirmedGroupList, {
-  dataImportCheck$importRunValue <- FALSE
-  # if (nrow(variables$CountData) == 0) {
-  #   sendSweetAlert(
-  #     session = session,
-  #     title = "ERROR",
-  #     text = "Please input raw data table!",
-  #     type = "error"
-  #   )
-  #   return()
-  # }
-  # if (is.null(input$uploadGroup)) {
-  #   sendSweetAlert(
-  #     session = session,
-  #     title = "ERROR",
-  #     text = "Please input group information!",
-  #     type = "error"
-  #   )
-  #   return()
-  # }
+output$raw_boxplot <- renderPlotly({
+  req(nrow(variables$CountData) > 0)     # require expression data
+  req(input$table_rows_selected)         # require a row click
   
-  group <- data.frame(fread(input$uploadGroup$datapath, header = T, blank.lines.skip = T))
-  group_no_header <- data.frame(fread(input$uploadGroup$datapath,header = FALSE))
+  # Expression data (skip first 2 meta columns)
+  data <- variables$CountData[, 3:ncol(variables$CountData)]
   
-  showNotification("Group information uploaded successfully.", type = "message")
+  # Row index when clicking the row
+  rowInd <- input$table_rows_selected
+  expr <- as.numeric(data[rowInd, ])
   
-  #store group information
-  colnames(group)[1] <- "sample"
-  variables$group <- group
-  
-  
-  # variables$group_no_header <- group_no_header
-  group_no_header <- group_no_header[-1,]
-  groupName <- colnames(group)
-  
-  
-  # Create groupList
-  variables$groupList <- split(group_no_header$V1, group_no_header$V2)
-  
-  # Match the groups in group info to expression data samples
-  data.cl <- rep(0, ncol(variables$CountData))
-  for (i in seq_along(variables$groupList)) {
-    indices <- match(variables$groupList[[i]], colnames(variables$CountData))
-    data.cl[indices] <- names(variables$groupList)[i]
+  # --- Group mapping logic ---
+  if (is.null(variables$group) || is.null(input$groups1)) {
+    # No group info uploaded as default group
+    data.cl <- rep("Samples", ncol(data))
+  } else {
+    # Use uploaded group info
+    data.cl <- variables$groupListConvert
+    data.cl <- data.cl[data.cl!=0]
+    if (all(data.cl == 0)) {
+      data.cl <- rep("Unassigned", ncol(data))
+    }
   }
   
+  # Build plotting dataframe
+  #group_levels <- unique(names(variables$groupList))
+  df <- data.frame(
+    samples   = colnames(data),
+    intensity = round(log2(expr), digits = 2),
+    group     = factor(data.cl, levels = unique(data.cl))
+  )
   
+  # Order x-axis by group
+  xOrderVector <- unique(df$samples[order(df$group)])
+  xform <- list(
+    categoryorder = "array",
+    categoryarray = xOrderVector,
+    title = ""
+  )
   
-  # Storage convert group list to local
-  variables$groupListConvert <- data.cl
-  
-  #store numeric data
-  variables$count.data <- as.matrix(variables$CountData[, data.cl != 0])
-  
+  # Plot barplot
+  plot_ly(
+    data = df,
+    x = ~samples,
+    y = ~intensity,
+    color = ~group,          # color by group (or "All Samples")
+    text = ~intensity,
+    type = "bar",
+    showlegend = TRUE
+  ) %>%
+    layout(
+      xaxis = xform,
+      yaxis = list(
+        title = "Intensity distribution of original data",
+        range = c(0.9 * min(df$intensity), max(df$intensity) + 0.5)
+      ),
+      title = rownames(data)[rowInd]
+    ) %>%
+    plotly::config(
+      toImageButtonOptions = list(
+        format = "svg",
+        filename = rownames(data)[rowInd]
+      )
+    )
+})
 
-  
-  # Store converted group info
-  group2 <- data.frame(group = factor(data.cl[data.cl != 0]))
-  rownames(group2) <- colnames(variables$count.data)
-  variables$group_import <- group2
-  
 
+observeEvent(input$confirmedGroupList, {
+  if (nrow(datasetInput()) == 0) {
+    sendSweetAlert(
+      session = session,
+      title = "ERROR",
+      text = "Please input raw data table!",
+      type = "error"
+    )
+    return()
+  }
+  if (is.null(input$uploadGroup)) {
+    sendSweetAlert(
+      session = session,
+      title = "ERROR",
+      text = "Please input group information!",
+      type = "error"
+    )
+    return()
+  }
   
-  output$groupSelection = renderUI({
-    
-    
-    df = variables$group
-    if (is.null(colnames(df))) {
-      vars = NULL
-    } else {
-      vars = colnames(df)[2: ncol(df)]    
+  tryCatch(
+    {
+      progressSweetAlert(
+        session = session,
+        id = "dataImportProgress",
+        title = "Processing group info",
+        display_pct = TRUE,
+        value = 0
+      )
+      showNotification("Uploading file...", type = "message")
+      
+      
+      group <- data.frame(fread(input$uploadGroup$datapath, header = T, blank.lines.skip = T))
+      group_no_header <- data.frame(fread(input$uploadGroup$datapath,header = FALSE))
+      
+      showNotification("Data uploaded successfully.", type = "message")
+      
+      #store group information
+      colnames(group)[1] <- "sample"
+      variables$group <- group
+      
+      
+      # variables$group_no_header <- group_no_header
+      group_no_header <- group_no_header[-1,]
+      groupName <- colnames(group)
+      
+      
+      # Create groupList
+      variables$groupList <- split(group_no_header$V1, group_no_header$V2)
+      
+      # Match the groups in group info to expression data samples
+      data.cl <- rep(0, ncol(variables$CountData))
+      for (i in seq_along(variables$groupList)) {
+        indices <- match(variables$groupList[[i]], colnames(variables$CountData))
+        data.cl[indices] <- names(variables$groupList)[i]
+      }
+      
+      
+      
+      # Storage convert group list to local
+      variables$groupListConvert <- data.cl
+      
+      #store numeric data
+      variables$count.data <- as.matrix(variables$CountData[, data.cl != 0])
+      
+      # Check if sample info matches raw data
+      if (ncol(variables$count.data) != nrow(group)) {
+        sendSweetAlert(
+          session = session,
+          title = "Warning",
+          text = "Sample number should match group info.",
+          type = "warning"
+        )
+        return()
+      }
+      
+      # Store converted group info
+      group2 <- data.frame(group = factor(data.cl[data.cl != 0]))
+      rownames(group2) <- colnames(variables$count.data)
+      variables$group_import <- group2
+      
+      updateProgressBar(
+        session = session,
+        id = "dataImportProgress",
+        title = "Summarizing data",
+        value = 90
+      )
+      
+      output$groupSelection = renderUI({
+        
+        metaData1 <- reactive(variables$group)
+        df = metaData1()
+        if (is.null(colnames(df))) {
+          vars = NULL
+        } else {
+          vars = colnames(df)[2: ncol(df)]    
+        }
+        
+        selectInput("groups1", "Grouping variable",
+                    choices = vars, selected = vars[1])
+      })
+      
+      closeSweetAlert(session = session)
+      sendSweetAlert(
+        session = session,
+        title = "DONE",
+        text = "Group labels were successfully assigned.",
+        type = "success"
+      )
+      
+      dataImportCheck$importRunValue <- input$confirmedGroupList
+      
+    },
+    error = function(e) {
+      sendSweetAlert(
+        session = session,
+        title = "ERROR",
+        text = "Check your group information format!",
+        type = "error"
+      )
+      return()
+    },
+    warning = function(w) {
+      sendSweetAlert(
+        session = session,
+        title = "Group Error!",
+        text = "Check your group information format!",
+        type = "error"
+      )
+      return()
     }
-    print(vars)
-    selectInput("groups1", "Grouping variable",
-                choices = vars, selected = vars[1])
-    
-  })
-  
- 
-  dataImportCheck$importRunValue <- TRUE
+  )
 })
 
 
@@ -291,58 +433,60 @@ observeEvent(input$groups1,{
   rownames(group2) <- colnames(variables$count.data)
   variables$group_import <- group2
   
-  output$importDataSummary <- renderUI({
-    dt <- variables$CountData
-    dup <- variables$dup
-    
-    rowCount <- nrow(dt)
-    groupCount <- length(variables$groupList)
-    groupText <- sapply(variables$groupList, length)
-    if (length(groupText) > 0) {
-      gText <- paste0(names(groupText), ": ", groupText, collapse = "<br>")
-    } else {
-      gText <- NULL
-    }
-    variables$groupText <- gText
-    data <- variables$CountData
-    data.cl <- variables$groupListConvert
-    cName <- unlist(variables$groupList)
-    nNA <- variables$nNA
-    tagList(
-      tipify(
-        tags$p(tags$b("N", tags$sub("Protein/Peptide")), ":", rowCount),
-        title = "Number of proteins/peptides",
-        placement = "left"
-      ),
-      tipify(
-        tags$p(tags$b("N", tags$sub("group")),": ", groupCount),
-        title = "Number of groups",
-        placement = "left",
-      ),
-      tipify(
-        tags$p(tags$b("N", tags$sub("samples in group")), HTML(": <br>"), HTML(gText)),
-        title = "Number of samples in each group",
-        placement = "left"
-      ),
-      tipify(
-        tags$p(tags$b("N", tags$sub("replicates")), ": ", dup),
-        title = "Number of replicated gene names",
-        placement = "left"
-      ),
-      tipify(
-        tags$p(tags$b("Nrow",tags$sub("NA")), ": ", nNA),
-        title = "Rows of proteins/petides that contain at least 1 NA",
-        placement = "left"
-      )
-    )
-  })
-  
-  
 })
 
+#add box plot
 
+output$importDataSummary <- renderUI({
+  dt <- datasetInput()
+  dup <- variables$dup
+  
+  rowCount <- nrow(dt)
+  groupCount <- length(variables$groupList)
+  groupText <- sapply(variables$groupList, length)
+  if (length(groupText) > 0) {
+    gText <- paste0(names(groupText), ": ", groupText, collapse = "<br>")
+  } else {
+    gText <- NULL
+  }
+  variables$groupText <- gText
+  
+  data <- variables$CountData
+  data.cl <- variables$groupListConvert
+  cName <- unlist(variables$groupList)
+  nNA <- variables$nNA
+  
+  tagList(
+    tipify(
+      tags$p(tags$b("N", tags$sub("Protein/Peptide")), ":", rowCount),
+      title = "Number of proteins/peptides",
+      placement = "left"
+    ),
+    tipify(
+      tags$p(tags$b("N", tags$sub("group")),": ", groupCount),
+      title = "Number of groups",
+      placement = "left",
+    ),
+    tipify(
+      tags$p(tags$b("N", tags$sub("samples in group")), HTML(": <br>"), HTML(gText)),
+      title = "Number of samples in each group",
+      placement = "left"
+    ),
+    tipify(
+      tags$p(tags$b("N", tags$sub("replicates")), ": ", dup),
+      title = "Number of replicated gene names",
+      placement = "left"
+    ),
+    tipify(
+      tags$p(tags$b("Nrow",tags$sub("NA")), ": ", nNA),
+      title = "Rows of proteins/petides that contain at least 1 NA",
+      placement = "left"
+    )
+  )
+})
 
-# This function render a boxplot of sample distribution ----
+v <- reactiveValues(importActionValue = FALSE)
+
 # This function render a boxplot of sample distribution ----
 
 output$sampleDistributionBox <- renderPlotly({
@@ -1070,4 +1214,3 @@ output$dendUI <- renderUI({
     helpText("No data for ploting. Please import dataset and assign group information first.")
   }
 })
-

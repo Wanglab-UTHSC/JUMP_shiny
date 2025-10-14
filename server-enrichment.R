@@ -1,17 +1,35 @@
 #server-enrichment.R
 
 library(clusterProfiler)
-options(clusterProfiler.download.method = "wget")
+library(R.utils)
 library(enrichplot)
 library(ggnewscale)
 library(org.Hs.eg.db)
 library(org.Mm.eg.db)
 library(ggplot2)
 library(plotly)
+library(data.table)
+library(DT)
 
+
+options(clusterProfiler.download.method = "wget")
 
 FilterRun <- reactiveValues(FilterRunValue = FALSE)
 enRun <- reactiveValues(enRunValue = FALSE)
+customPW <- reactiveValues(term2gene = NULL, term2name = NULL)
+
+
+.clean_genes <- function(x) {
+  x <- trimws(x); x <- x[nzchar(x)]
+  toupper(x)
+}
+.try_read_maybe_tab_or_csv <- function(p) {
+  dt <- tryCatch(fread(p, sep="\t", header=TRUE, data.table=FALSE), error=function(e) NULL)
+  if (is.null(dt) || ncol(dt) == 1) {
+    dt <- fread(p, sep=",", header=TRUE, data.table=FALSE)
+  }
+  dt
+}
 
 #UI of the first three tabs
 output$enrich_filter <- renderUI({
@@ -300,7 +318,7 @@ output$preEnrichResultTable <- renderUI({
 #Parameter selection if enrich GO or GSE is selected
 output$go_enrich_select <- renderUI({
   method <- input$method
-  if(method == "go_enrich"){
+  if(method == "go_enrich"||method =="gsea_enrich"){
     selectInput("ont", "Ontology",
                 choices = c(
                   "ALL" = "ALL",
@@ -316,30 +334,134 @@ output$go_enrich_select <- renderUI({
 
 
 #------------Run Enrichment Test---------
+observeEvent(input$useCustomGenes,{
+  data <- variables$result
+  
+  customGenes <- unlist(strsplit(x = input$customGenes, split = "[\r\n]"))
+  
+  variables$customGenes <- customGenes
+  matched <- intersect(customGenes,data$GN)
+  genes_notfound <- setdiff(customGenes,data$GN)
+  sendSweetAlert(
+    session = session,
+    title = "Success!",
+    text = "Custom gene list uploaded.",
+    type = "success"
+  )
+  showNotification("Custom gene list uploaded", type = "message", duration = 10)
+  
+})
 
+
+#Helper funciton to identify the symbols user entered
+# Normalize common ID quirks (version suffixes, isoforms)
+normalize_ids <- function(ids) {
+  ids <- trimws(ids)
+  ids <- gsub("\\.\\d+$", "", ids)   # drop version: ENSG..., NM_... .1
+  ids <- toupper(ids)               # UniProt often uppercase
+  unique(ids[nzchar(ids)])
+}
+key_type <- function(customList) {
+  ids <- customList
+  
+  # Patterns:
+  # Ensembl genes: human(most): ENSG..., mouse: ENSMUSG..., general: ENS[A-Z]{0,3}G\d+
+  is_ensembl <- grepl("^ENS[A-Z]{0,3}G\\d+$", ids)
+  
+  # RefSeq: NM_, NR_, NP_ (curated), XM_, XR_, XP_ (predicted), NC_ (genomic)
+  is_refseq  <- grepl("^(NM|NR|NP|XM|XR|XP|NC)_[0-9]+(\\.[0-9]+)?$", ids)
+  
+  # UniProt accessions:
+  #  Classic 6-char: [OPQ][0-9][A-Z0-9]{3}[0-9]  or  [A-NR-Z][0-9][A-Z0-9]{3}[0-9]
+  #  New style: A0Axxxxx (A0A + 7 alnum), allow -isoform suffixes
+  is_uniprot <- grepl("^([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9][A-Z0-9]{3}[0-9]|A0A[A-Z0-9]{7})(-[0-9]+)?$", ids)
+  
+  # Entrez ID
+  is_entrez  <- grepl("^[0-9]+$", ids)
+  
+  # Compute match rates
+  n <- length(ids)
+  rate <- c(
+    ENSEMBL = sum(is_ensembl)/n,
+    REFSEQ  = sum(is_refseq)/n,
+    UNIPROT = sum(is_uniprot)/n,
+    ENTREZID= sum(is_entrez)/n
+  )
+
+  
+  best <- names(rate)[which.max(rate)]
+  confidence <- max(rate)
+  if (confidence == 0) {
+    best <- "SYMBOL"
+    return(best)
+  } else {
+    return(best = best)
+  }
+}
+
+observeEvent(input$customPathwayFile, {
+  #req(input$customPathwayFile)
+  path <- input$customPathwayFile$datapath
+  fmt  <- input$pathwayFileFormat %||% "std"
+  
+  t2g <- NULL; t2n <- NULL
+  
+  if (fmt == "std") {
+    dt <- .try_read_maybe_tab_or_csv(path)
+    shiny::validate(need(!is.null(dt), "Could not read file."))
+    shiny::validate(need(all(c("Pathway","Description","Gene") %in% colnames(dt)),
+                  "Standard format needs columns: Pathway, Description, Gene."))
+    dt$Gene <- .clean_genes(dt$Gene)
+    t2g <- unique(dt[, c("Pathway","Gene")]); colnames(t2g) <- c("TERM","GENE")
+    t2n <- unique(dt[, c("Pathway","Description")]); colnames(t2n) <- c("TERM","NAME")
+    
+  } else if (fmt == "two_column") {
+    dt <- .try_read_maybe_tab_or_csv(path)
+    shiny::validate(need(!is.null(dt), "Could not read file."))
+    if (!all(c("Pathway","Gene") %in% colnames(dt)) && ncol(dt) >= 2) {
+      colnames(dt)[1:2] <- c("Pathway","Gene")
+    }
+    shiny::validate(need(all(c("Pathway","Gene") %in% colnames(dt)),
+                  "Two-column format needs columns: Pathway, Gene."))
+    dt$Gene <- .clean_genes(dt$Gene)
+    t2g <- unique(dt[, c("Pathway","Gene")]); colnames(t2g) <- c("TERM","GENE")
+    
+  } else if (fmt == "multi_column") {
+    dt <- .try_read_maybe_tab_or_csv(path)
+    colnames(dt)[1] <- "Pathway"
+    long <- data.frame(Pathway = rep(dt$Pathway, ncol(dt)-1),
+                       Gene = as.vector(as.matrix(dt[, -1, drop=FALSE])),
+                       stringsAsFactors = FALSE)
+    long$Gene <- .clean_genes(long$Gene)
+    t2g <- unique(subset(long, nzchar(Gene))[, c("Pathway","Gene")])
+    colnames(t2g) <- c("TERM","GENE")
+  }
+  
+  
+  t2g <- subset(unique(t2g), nzchar(TERM) & nzchar(GENE))
+  customPW$term2gene <- t2g
+  customPW$term2name <- t2n
+  
+  # Quiet success ping (no details leaked)
+  updateSelectInput(session, "method", selected = "custom_enrich")
+  showNotification("Switched enrcihment method to 'Custom Annotation(uploaded)'.",
+                   type = "message", duration = 4)
+  showNotification("Custom pathways loaded.", type = "message", duration = 4)
+})
 observeEvent(input$runEnrichmentAnalysis,{
   
-  # progressSweetAlert(
-  #   session = session,
-  #   id = "enrichmentProgress",
-  #   title = "Loading parameter",
-  #   display_pct = TRUE,
-  #   value = 0
-  # )
-  # 
-  # updateProgressBar(
-  #   session = session,
-  #   id = "enrichmentProgress",
-  #   title = "Loading data",
-  #   value = 30
-  # )
-  # 
   #Load Data
   data <- variables$enrichedDataList
   wholeData <- variables$CountData
-  gene <- data$GN
   geneLst <- wholeData$GN
-  
+  if(length(variables$customGenes)!=0){
+    gene <- variables$customGenes
+    key = key_type(gene)
+    
+  }else{
+    gene <- data$GN
+    key = key_type(gene)
+  }
   #method selection
   method <- input$method
   
@@ -351,7 +473,7 @@ observeEvent(input$runEnrichmentAnalysis,{
   
   
   #Obtain whether key is ENSEMBL, GN, or PID
-  key = "SYMBOL"
+  
   pval = input$enrich_pvalCut
   qval = input$enrich_qvalCut
   minGSSize <- input$minGSSize
@@ -365,23 +487,7 @@ observeEvent(input$runEnrichmentAnalysis,{
   # )
   
   #translate to symbols
-  tryCatch(
-    {
-      showNotification("Converting mapping ID key type", type = "message")
-      gene_go <- bitr(gene, fromType=key, toType="UNIPROT", OrgDb=org)
-      geneLst_go <- bitr(geneLst, fromType=key, toType="UNIPROT", OrgDb=org)
-    },
-    error = function(e){
-      #closeSweetAlert(session = session)
-      sendSweetAlert(
-        session = session,
-        title = "Enrichment Analysis failed",
-        text = "Convert keytype failed. Please check your selected organism.",
-        type = "error"
-      )
-      return()
-    }
-  )
+  
 
   
   
@@ -395,43 +501,37 @@ observeEvent(input$runEnrichmentAnalysis,{
     kegg_org = "rno"
   }
   
-  # updateProgressBar(
-  #   session = session,
-  #   id = "enrichmentProgress",
-  #   title = "Perform Enrichment Analysis",
-  #   value = 70
-  # )
   gene_go <- gene[!duplicated(gene)]
   geneLst_go <- geneLst[!duplicated(geneLst)]
   
-  showNotification("Enrichment analysis starting...", type = "message",duration = 20)
+  showNotification("Enrichment analysis starting...", type = "message",duration = 50)
   if(method == "go_enrich"){
-    tryCatch({
-      ego <- enrichGO(gene = gene_go,
-                      universe = geneLst_go,
-                      OrgDb         = org,
-                      keyType       = key,
-                      ont           = ont,
-                      pvalueCutoff  = pval,
-                      qvalueCutoff  = qval,
-                      readable = TRUE)
-      variables$en_result <- ego
-    },
-      error = function(e) {
-        sendSweetAlert(
-          session = session,
-          title = "Enrichment Analysis failed. ",
-          text = "Please check your parameters.",
-          type = "error"
-        )
-        return()
-        })
+    ego <- try(
+      enrichGO(gene          = gene_go,
+               universe      = geneLst_go,
+               OrgDb         = org,
+               keyType       = key,
+               ont           = ont,
+               pvalueCutoff  = pval,
+               qvalueCutoff  = qval,
+               minGSSize     = minGSSize,
+               maxGSSize     = maxGSSize,
+               readable      = TRUE),
+      silent = TRUE
+    )
+
+    if (inherits(ego, "try-error")) {
+      sendSweetAlert(session, "Enrichment failed", "GO enrichment error. Please check organism/parameters.", type = "error")
+      return()
+    }
+    variables$en_result <- ego
   }
   else if(method == "gsea_enrich"){
     geneList <- data$Log2Fold
     name <- row.names(data)
     geneList2 <- as.data.frame(cbind(name,geneList))
-    name <- bitr(name, fromType=key, toType="ENTREZID", OrgDb=org)
+    if(key != "ENTREZID") name <- bitr(name, fromType=key, toType="ENTREZID", OrgDb=org)
+    
     geneList2 <- geneList2[geneList2$name %in% name$UNIPROT,]
     geneList <- as.numeric(geneList2$geneList)
     
@@ -451,7 +551,9 @@ observeEvent(input$runEnrichmentAnalysis,{
     
   }
   else if(method == "kegg_enrich"){
-    gene_kegg <- bitr(gene, fromType=key, toType="ENTREZID", OrgDb=org)
+    if(key != "ENTREZID"){
+      gene_kegg <- bitr(gene, fromType=key, toType="ENTREZID", OrgDb=org)
+    }
     
     
     ego <- enrichKEGG(gene  = gene_kegg$ENTREZID,
@@ -463,6 +565,32 @@ observeEvent(input$runEnrichmentAnalysis,{
     ego_readable <- setReadable(ego,OrgDb = org,keyType = "ENTREZID")
     
     variables$en_result <- ego_readable
+  }
+  else if (method == "custom_enrich"){
+    t2g <- customPW$term2gene
+    shiny::validate(need(!is.null(t2g) && nrow(t2g) > 0,
+                  "Please upload a custom pathway database first."))
+    
+    # Intersect user genes to uploaded gene universe (IDs must match as text)
+    gene_use <- intersect(.clean_genes(gene), unique(t2g$GENE))
+    shiny::validate(need(length(gene_use) > 0,
+                  "None of your genes matched the uploaded pathways. Check ID types/case."))
+    
+    # Optional background universe from your dataset (keeps p-values conservative)
+    bg <- intersect(.clean_genes(variables$CountData$GN), unique(t2g$GENE))
+    if (length(bg) < length(gene_use)) bg <- unique(t2g$GENE)  # fallback to all uploaded genes
+    
+    ego <- enricher(
+      gene         = gene_go,
+      TERM2GENE    = t2g,
+      TERM2NAME    = customPW$term2name,   # can be NULL
+      pvalueCutoff = pval,
+      qvalueCutoff = qval,
+      minGSSize    = minGSSize,
+      maxGSSize    = maxGSSize,
+      universe     = bg
+    )
+    variables$en_result <- ego
   }
   else{
     geneList <- data$Log2Fold
@@ -502,10 +630,12 @@ observeEvent(input$runEnrichmentAnalysis,{
   output$downloadEnResultTable <- downloadHandler(
     filename = "enrichment_result.csv",
     content = function(file) {
-      write.csv(variables$en_table, file)
+      write.csv(variables$en_table,file)
     }
   )
-  table <- fortify(ego,showCategory = length(ego@result$ID))
+  
+  table <- variables$en_table
+  #table <- fortify(ego,showCategory = length(ego@result$ID))
   output$afterEnrichResultTable <- DT::renderDataTable({ 
     data <- table
     data$`pvalue` = formatC(data$`pvalue`, format = "e", digits = 3)
@@ -545,6 +675,7 @@ observeEvent(input$runEnrichmentAnalysis,{
 })
 
 
+
 output$afterEnrichResultUI <- renderUI({
   if(enRun$enRunValue){
     tagList(fluidRow(column(
@@ -563,8 +694,8 @@ output$afterEnrichResultUI <- renderUI({
 #Bubble Plot
 
 output$bubbleplotObject <- renderPlot({
-  validate(
-    need(nrow(variables$en_result)!=0, message = "No enriched term found")
+  shiny::validate(
+    shiny::need(nrow(variables$en_result)!=0, message = "No enriched term found")
   )
   data <- variables$en_result
   p <- dotplot(data,showCategory = 20)+ggtitle("Dot plot")
@@ -589,8 +720,8 @@ output$EN_dotPlot <- renderUI({
 
 
 output$enrichmentMap <- renderPlot({
-  validate(
-    need(nrow(variables$en_result)!=0, message = "No enriched term found")
+  shiny::validate(
+    shiny::need(nrow(variables$en_result)!=0, message = "No enriched term found")
   )
   data <- variables$en_result
   x <- pairwise_termsim(data)
