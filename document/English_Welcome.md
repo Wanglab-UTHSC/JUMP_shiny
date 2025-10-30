@@ -6,6 +6,11 @@ JUMP Shiny is a comprehensive web platform designed for mass spectrometry-based 
 This platform provides intuitive visualizations and functionalities that facilitate in-depth exploration of proteomics data.
 The tutorial tab will guide you through user interface, functionalities, and detailed steps to perform the analysis.
 
+### Citation
+If you use JUMPshiny in your work, please cite:
+
+Zhang, A., Fu, Y., Yuan, Z.-F., Wu, L., Kong, D., Li, L., Wu, Z., Prins, P., Peng, J., & Wang, X. (n.d.). JUMPshiny: A User-Friendly Platform for Comprehensive Analysis and Visualization of Quantitative Proteomics Data. PROTEOMICS, n/a(n/a), e70061. https://doi.org/10.1002/pmic.70061
+
 
 
 ### Contact Information 
