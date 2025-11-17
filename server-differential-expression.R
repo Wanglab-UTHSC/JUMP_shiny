@@ -330,7 +330,7 @@ observeEvent(input$DETestType,{
   }
 
    
-  # description <- data_imputed[c(1,2)]
+  description <- data_imputed[c(1,2)]
   data_imputed <- data_imputed[-c(1,2)]
   #perform limma
   statRes = reactive(statTest(data_imputed, level, comparison,dfSample,data.cl,factors))
@@ -360,9 +360,9 @@ observeEvent(input$DETestType,{
   # Select DE peptides/proteins and organize a dataset for subsequent analyses
   rowInd = which(statres$res[[sigMetric]] < sigCutoff & absLogFC >= logFC)
   if (nGroups == 2) {
-    exprs = cbind(variables$CountData[, c(1, 2)],exprs, `p-value` = statres$res$`p-value`, FDR = statres$res$FDR, Log2Fold = resLogFC)
+    exprs = cbind(description,exprs, `p-value` = statres$res$`p-value`, FDR = statres$res$FDR, Log2Fold = resLogFC)
   } else if (nGroups > 2) {
-    exprs = cbind(variables$CountData[, c(1, 2)],exprs, `p-value` = statres$res$`p-value`, FDR = statres$res$FDR)
+    exprs = cbind(description,exprs, `p-value` = statres$res$`p-value`, FDR = statres$res$FDR)
     exprs = cbind(exprs, resLogFC)
   }
   
