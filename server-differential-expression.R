@@ -392,8 +392,8 @@ observeEvent(input$DETestType,{
       DT::datatable(data)
     } else {
       #data = variables$result
-      data$`p-value` = formatC(data$`p-value`, digits = 4, format = "e")
-      data$FDR = formatC(data$FDR, digits = 4,format = "e")
+      data$`p-value` = signif(data$`p-value`, digits = 4)
+      data$FDR = signif(data$FDR, digits = 4)
       log2Ind = grep("Log2Fold", colnames(data))
       colInd = c(3:(log2Ind[1]-3))
       data[colInd] = round(data[colInd], digits = 4)
