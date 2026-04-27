@@ -1,40 +1,43 @@
-# Running
+# JUMP Shiny Manual
+- [JUMP Shiny Manual](#jump-shiny-manual)
+  - [Introduction](#introduction)
+  - [Getting Started](#getting-started)
+    - [Accessing JUMP Shiny](#accessing-jump-shiny)
+    - [User Interface Overview](#user-interface-overview)
+      - [Experimental Design](#experimental-design)
+      - [Exploratory Analysis](#exploratory-analysis)
+      - [Batch Normalization](#batch-normalization)
+      - [Differential Expression Analysis](#differential-expression-analysis)
+      - [Enrichment Analysis](#enrichment-analysis)
+  - [About](#about)
 
-The main repo is hosted on:
 
-```
-git clone git.genenetwork.org:/home/git/shared/source/jumpshiny
-```
+## Introduction
+Welcome to JUMP shiny, a comprehensive web platform designed for mass spectrometry-based proteomics. JUMP Shiny encompasses a wide range of analyses, including experimental design, data normalization, differential expression, and enrichment analysis. JUMP shiny provides intuitive tools and visualizations to facilitate your proteomics data analysis. This manual will guide you through the user interface, functionalities, and detailed steps involved in performing a comprehensive proteomic analysis using JUMP shiny. 
 
-## Guix
 
-On the server we can deploy the service as a Guix container. Basically install Guix and run `guix pull`:
+## Getting Started
+### Accessing JUMP Shiny
+To begin your proteomic analysis, please visit the JUMP shiny web platform (https://jumpshiny.genenetwork.org). If you would like to process large datasets, you can use the local version available on GitHub (https://github.com/Wanglab-UTHSC/JUMP_shiny) for more efficient processing and analysis.
+### User Interface Overview
+#### Experimental Design
 
-```
-guix pull # pull the latest version of guix
-```
+#### Exploratory Analysis
+The Exploratory Analysis section is designed for uploading and visualizing the dataset you upload to JUMP shiny.
+Dataset Summarization: Provides an overview of the dataset, including key statistics and characteristics.
+Sample Distribution Plot: Offers a visual representation of sample distribution for quality control.
+Heatmap and PCA Graphs: Displays significant values in the original data through heatmap and Principal Component Analysis (PCA) graphs.
+#### Batch Normalization
+These two sections focus on data normalization and covariate correction, offering various plots to visualize the results after normalization.
+#### Differential Expression Analysis
+This section allows for differential expression analysis with detailed tables and interactive plots:
+Volcano Plot: Visualize fold changes and statistical significance of differentially expressed genes.
+Heatmap: Interactive heatmap displaying expression patterns of proteins.
+In addition, you can explore sample variation through standard deviation analysis. 
+#### Enrichment Analysis
+Enrichment analysis is used to identify biological pathways, molecular functions, and cellular components that are significantly overrepresented in a given set of proteins. 
+## About
+If you have any questions or suggestions, please contact:
 
-It takes a while. You only need to do this once!
-
-Next, make sure the new Guix is in the path:
-
-```
-unset GUIX_PROFILE
-~/.guix-profile/etc/profile
-guix describe
-```
-
-Next, git clone guix-bioinformatics and run the script
-
-```
-git clone tux02.genenetwork.org:/home/git/public/guix-bioinformatics
-source .guix-run
-  (ignore warnings)
-  Listening on http://127.0.0.1:3978
-```
-
-If you have a problem share the output on the console at any stage.
-
-## nginx
-
-For an example for proxy forwarding nginx, see [nginx.conf](etc/nginx.conf)
+Aijun Zhang: azhang97@stjude.org or azhang16@uthsc.edu. 
+Xusheng Wang: xwang39@uthsc.edu
