@@ -1,3 +1,10 @@
 lib/
 *.out
 guix-bioinformatics
+
+# macOS metadata files
+.DS_Store
+**/.DS_Store
+._*
+**/._*
+.claude/worktrees/blissful-lalande-2e5c31
